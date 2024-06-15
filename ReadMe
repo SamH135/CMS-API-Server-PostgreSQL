@@ -1,0 +1,44 @@
+HOW TO RUN:
+
+    - Download node.js if you don't already have it
+
+    - Clone the repository
+
+    - cd to project directory
+
+    - In the terminal run these commands:
+
+        npm init -y
+
+        npm install express pg dotenv express-session body-parser connect-pg-simple cors bcryptjs jsonwebtoken nodemon
+
+        npm start
+
+    NOTE: 
+        don't forget to add "start" script to package.json file
+
+        ex:
+        "scripts": {
+            "test": "echo \"Error: no test specified\" && exit 1",
+            "start": "node app.js"
+        },
+
+
+
+
+
+Development notes/goals:
+
+    determine any extra features to make ready for production
+
+    need to add receipt view logic/queries - also to FE
+
+    need to add logic to determine when clients need pickups 
+    based on their last pickupdate and time in between
+
+    connect last pickup to last receipt -> unless manually changed (update pickupdate)
+
+    consider adding queries to make more interesting displays in front end
+
+
+
