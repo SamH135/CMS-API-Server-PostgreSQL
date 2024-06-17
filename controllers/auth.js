@@ -12,17 +12,69 @@ const pool = new Pool({
   max: 10,
 });
 
+exports.authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (token == null) {
+    return res.sendStatus(401);
+  }
 
-exports.authenticateUser = (requiredRole) => (req, res, next) => {
-  if (req.session.userID && req.session.userType) {
-    if (requiredRole && req.session.userType !== requiredRole) {
-      console.log("Forbidden");
-      return res.status(403).json({ message: 'Forbidden' });
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.sendStatus(403);
     }
+    req.user = user;
     next();
-  } else {
-    console.log("Unauthorized");
-    return res.status(401).json({ message: 'Unauthorized' });
+  });
+};
+
+exports.authorizeRole = (role) => {
+  return (req, res, next) => {
+    if (req.user && req.user.userType === role) {
+      next();
+    } else {
+      res.sendStatus(403);
+    }
+  };
+};
+
+exports.login = async (req, res) => {
+  const { userID, password } = req.body;
+
+  const timestamp = () => new Date().toISOString();
+
+  console.log(`[${timestamp()}] Login attempt for userID: ${userID}`);
+
+  try {
+    const { rows: results } = await pool.query("SELECT * FROM \"User\" WHERE UserID = $1", [userID]);
+    console.log(`[${timestamp()}] Query executed for userID: ${userID}`);
+
+    if (results.length === 0) {
+      console.log(`[${timestamp()}] User ID not registered: ${userID}`);
+      return res.status(401).json({ message: 'That user ID has not been registered yet' });
+    }
+
+    console.log(`[${timestamp()}] User found: ${userID}`);
+    let match = await bcrypt.compare(password, results[0].password);
+    console.log(`[${timestamp()}] Password comparison completed for userID: ${userID}`);
+
+    if (match) {
+      const token = jwt.sign(
+        { userID: results[0].userid, userType: results[0].usertype },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      console.log(`[${timestamp()}] JWT token generated for userID: ${userID}`);
+      return res.status(200).json({ token, userType: results[0].usertype });
+    } else {
+      console.log(`[${timestamp()}] Invalid password for userID: ${userID}`);
+      return res.status(401).json({ message: 'Invalid password' });
+    }
+  } catch (error) {
+    console.log(`[${timestamp()}] ERROR: ${error.message}`);
+    return res.status(500).json({ message: 'An error occurred during login' });
   }
 };
 
@@ -53,63 +105,13 @@ exports.register = async (req, res) => {
   }
 };
 
-exports.login = async (req, res) => {
-  const { userID, password } = req.body;
-
-  console.log(new Date().toISOString(), "Login attempt - UserID:", userID);
-  console.log(new Date().toISOString(), "Login attempt - Password:", password);
-
-  try {
-    const { rows: results } = await pool.query("SELECT * FROM \"User\" WHERE UserID = $1", [userID]);
-
-    if (results.length === 0) {
-      return res.status(401).json({ message: 'That user ID has not been registered yet' });
-    }
-
-    let match = await bcrypt.compare(password, results[0].password);
-
-    if (match) {
-      console.log("Login was successful");
-      req.session.userID = results[0].userid;
-      req.session.userType = results[0].usertype;
-      return res.status(200).json({ userType: results[0].usertype });
-    } else {
-      return res.status(401).json({ message: 'Invalid password' });
-    }
-  } catch (error) {
-    console.log("ERROR: " + error);
-    return res.status(500).json({ message: 'An error occurred during login' });
-  }
-};
-
-exports.logout = (req, res) => {
-  // Destroy the session and send a success response
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Error during logout:', err);
-      return res.status(500).json({ message: 'An error occurred during logout' });
-    }
-    console.log("Logout successful");
-    res.status(200).json({ message: 'Logout successful' });
-  });
-};
-
 exports.dashboard = (req, res) => {
-  console.log('req.session:', req.session);
-  const { userID, userType } = req.session;
-  console.log('UserID:', userID, 'userType:', userType);
-  if (!userID || !userType) {
-    console.log('User session not found');
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-  console.log('exports.dashboard called');
+  const { userID, userType } = req.user;
   return res.status(200).json({ userType });
 };
 
-
 exports.clientList = async (req, res) => {
   try {
-    console.log('exports.clientList called');
     const clients = await getClients();
     res.status(200).json({ clients });
   } catch (error) {
@@ -122,8 +124,7 @@ exports.clientInfo = async (req, res) => {
   const clientID = req.params.clientID;
   try {
     const client = await getClientByID(clientID);
-    const isAdmin = req.session.userType === 'admin';
-    res.status(200).json({ client, isAdmin });
+    res.status(200).json({ client });
   } catch (error) {
     console.error('Error retrieving client:', error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -143,8 +144,7 @@ exports.pickupInfo = async (req, res) => {
 exports.userDashboard = async (req, res) => {
   try {
     const users = await getUsers();
-    const currentUserID = req.session.userID;
-    res.status(200).json({ users, currentUserID });
+    res.status(200).json({ users });
   } catch (error) {
     console.error('Error retrieving users:', error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -210,12 +210,13 @@ exports.searchUsers = async (req, res) => {
   const searchTerm = req.query.term;
   try {
     const users = await searchUsersByTerm(searchTerm);
-    res.status(200).json({ users, currentUserID: req.session.userID });
+    res.status(200).json({ users });
   } catch (error) {
     console.error('Error searching users:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
 
 // Helper functions for database queries
 async function getClients() {
