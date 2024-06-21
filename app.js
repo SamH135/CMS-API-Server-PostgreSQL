@@ -1,22 +1,12 @@
 const express = require("express");
-const { Pool } = require("pg");
 const dotenv = require("dotenv");
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const app = express();
+const pool = require("./db");
 
 // Load environment variables from .env file
 dotenv.config({ path: './.env' });
-
-// Create a PostgreSQL connection pool
-const pool = new Pool({
-  host: process.env.POSTGRES_HOSTNAME,
-  port: process.env.POSTGRES_SERVER_PORT,
-  user: process.env.POSTGRES_USERNAME,
-  password: process.env.POSTGRES_PASSWORD,
-  database: process.env.POSTGRES_DATABASE,
-  max: 10,
-});
 
 // Test the database connection
 pool.query('SELECT 1')
@@ -43,3 +33,6 @@ const port = process.env.PORT || 5000;
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
+// Export the pool object
+module.exports = pool;

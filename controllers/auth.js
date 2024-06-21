@@ -1,16 +1,8 @@
-const { Pool } = require("pg");
+// controllers/auth.js
+
+const pool = require("../db");
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-
-// Create a PostgreSQL connection pool
-const pool = new Pool({
-  host: process.env.POSTGRES_HOSTNAME,
-  port: process.env.POSTGRES_SERVER_PORT,
-  user: process.env.POSTGRES_USERNAME,
-  password: process.env.POSTGRES_PASSWORD,
-  database: process.env.POSTGRES_DATABASE,
-  max: 10,
-});
 
 exports.authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -41,13 +33,12 @@ exports.authorizeRole = (role) => {
 
 exports.login = async (req, res) => {
   const { userID, password } = req.body;
-
   const timestamp = () => new Date().toISOString();
 
   console.log(`[${timestamp()}] Login attempt for userID: ${userID}`);
 
   try {
-    const { rows: results } = await pool.query("SELECT * FROM \"User\" WHERE UserID = $1", [userID]);
+    const { rows: results } = await pool.query('SELECT * FROM "User" WHERE UserID = $1', [userID]);
     console.log(`[${timestamp()}] Query executed for userID: ${userID}`);
 
     if (results.length === 0) {
@@ -131,6 +122,17 @@ exports.clientInfo = async (req, res) => {
   }
 };
 
+exports.updateClient = async (req, res) => {
+  const clientData = req.body;
+  try {
+    await updateClient(clientData);
+    res.status(200).json({ message: 'Client updated successfully' });
+  } catch (error) {
+    console.error('Error updating client:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
 exports.pickupInfo = async (req, res) => {
   try {
     const clients = await getClientsWithPickupInfo();
@@ -173,17 +175,6 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-exports.updateClient = async (req, res) => {
-  const { clientID, clientName, clientLocation } = req.body;
-  try {
-    await updateClient(clientID, clientName, clientLocation);
-    res.status(200).json({ message: 'Client updated successfully' });
-  } catch (error) {
-    console.error('Error updating client:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
-};
-
 exports.deleteUser = async (req, res) => {
   const userID = req.params.userID;
   try {
@@ -217,7 +208,6 @@ exports.searchUsers = async (req, res) => {
   }
 };
 
-
 // Helper functions for database queries
 async function getClients() {
   const { rows } = await pool.query('SELECT * FROM Client');
@@ -234,6 +224,56 @@ async function getClientsWithPickupInfo() {
   return rows;
 }
 
+async function updateClient(clientData) {
+  const {
+    clientid,
+    clientname,
+    clientlocation,
+    clienttype,
+    avgtimebetweenpickups,
+    locationnotes,
+    registrationdate,
+    locationcontact,
+    totalpayout,
+    totalvolume,
+    paymentmethod,
+    lastpickupdate,
+    needspickup
+  } = clientData;
+
+  await pool.query(`
+    UPDATE Client
+    SET
+      ClientName = $1,
+      ClientLocation = $2,
+      ClientType = $3,
+      AvgTimeBetweenPickups = $4,
+      LocationNotes = $5,
+      RegistrationDate = $6,
+      LocationContact = $7,
+      TotalPayout = $8,
+      TotalVolume = $9,
+      PaymentMethod = $10,
+      LastPickupDate = $11,
+      NeedsPickup = $12
+    WHERE ClientID = $13
+  `, [
+    clientname,
+    clientlocation,
+    clienttype,
+    avgtimebetweenpickups,
+    locationnotes,
+    registrationdate,
+    locationcontact,
+    totalpayout,
+    totalvolume,
+    paymentmethod,
+    lastpickupdate,
+    needspickup,
+    clientid
+  ]);
+}
+
 async function getUsers() {
   const { rows } = await pool.query('SELECT * FROM "User"');
   return rows;
@@ -242,10 +282,6 @@ async function getUsers() {
 async function getUserByID(userID) {
   const { rows } = await pool.query('SELECT * FROM "User" WHERE UserID = $1', [userID]);
   return rows[0];
-}
-
-async function updateClient(clientID, clientName, clientLocation) {
-  await pool.query('UPDATE Client SET ClientName = $1, ClientLocation = $2 WHERE ClientID = $3', [clientName, clientLocation, clientID]);
 }
 
 async function updateUserInfo(userID, username, userType) {
@@ -271,5 +307,3 @@ async function searchUsersByTerm(term) {
   `, [`%${term}%`]);
   return rows;
 }
-
-
