@@ -20,7 +20,7 @@ pool.query('SELECT 1')
   });
 
 app.use(cors({
-  origin: 'http://localhost:3000', // Replace with your React app's URL
+  origin: [process.env.CLIENT_URL, 'http://localhost:3000'], // DELETE localhost after testing
   credentials: true,
 }));
 
