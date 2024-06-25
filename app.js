@@ -1,4 +1,5 @@
 const express = require("express");
+const { scheduleTasksStart } = require('./scheduledTasks');
 const dotenv = require("dotenv");
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -28,6 +29,9 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 app.use('/api', require('./routes/auth'));
+
+// Start the scheduled tasks
+scheduleTasksStart();
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {

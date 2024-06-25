@@ -35,6 +35,7 @@ CREATE TABLE "User" (
 CREATE TABLE Receipt (
   ReceiptID SERIAL PRIMARY KEY,
   ClientID VARCHAR(10) NOT NULL,
+  PaymentMethod VARCHAR(20), -- needs to be set based on cliend payment method when created
   TotalVolume DECIMAL(10, 2) CHECK (TotalVolume >= 0),
   TotalPayout DECIMAL(10, 2) CHECK (TotalPayout >= 0),
   PickupDate DATE NOT NULL,
@@ -82,12 +83,12 @@ CREATE TABLE AutoClientTotals (
   TotalAluminumRadiators DECIMAL(10, 2) DEFAULT 0,
   TotalBrassCopperRadiators DECIMAL(10, 2) DEFAULT 0,
   TotalAluminum DECIMAL(10, 2) DEFAULT 0,
-  TotalCatalyticConverters INT DEFAULT 0,
   TotalBatteries DECIMAL(10, 2) DEFAULT 0,
   TotalPayout DECIMAL(10, 2) DEFAULT 0,
   FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
 );
 
+CREATE INDEX ON AutoClientTotals (ClientID);
 CREATE INDEX ON AutoClientTotals (TotalPayout);
 
 -- Create HVACClientTotals table - tracks running totals each client (hvac)
@@ -106,6 +107,7 @@ CREATE TABLE HVACClientTotals (
   FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
 );
 
+CREATE INDEX ON HVACClientTotals (ClientID);
 CREATE INDEX ON HVACClientTotals (TotalPayout);
 
 -- Create InsulationClientTotals table - tracks running totals each client (insulation)
@@ -117,6 +119,7 @@ CREATE TABLE InsulationClientTotals (
   FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
 );
 
+CREATE INDEX ON InsulationClientTotals (TotalPayout);
 CREATE INDEX ON InsulationClientTotals (TotalPayout);
 
 -- Create CatalyticConverter table - tracks detailed catalytic info 

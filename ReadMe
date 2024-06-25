@@ -32,9 +32,13 @@ Development notes/goals:
     determine any extra features to make ready for production
 
     need to add receipt view logic/queries - also to FE
+        - sum(receipts weights and payout) = totals on clientInfo
 
-    need to add logic to determine when clients need pickups 
-    based on their last pickupdate and time in between
+    test cron tasks
+
+    add createClient() to add clients
+
+    need to add logic to determine when clients need pickups based on their last pickupdate and time in between
 
     connect last pickup to last receipt -> unless manually changed (update pickupdate)
 

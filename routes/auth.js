@@ -19,4 +19,23 @@ router.post('/updateUser', authController.authenticateToken, authController.auth
 router.get('/searchClients', authController.authenticateToken, authController.searchClients);
 router.get('/searchUsers', authController.authenticateToken, authController.authorizeRole('admin'), authController.searchUsers);
 
+router.get('/clientMetals/:clientID', (req, res, next) => {
+    console.log('Hitting clientMetals route');
+    next();
+  }, authController.authenticateToken, authController.getClientMetals);
+  
+  router.get('/clientTotals/:clientID', (req, res, next) => {
+    console.log('Hitting clientTotals route');
+    next();
+  }, authController.authenticateToken, authController.getClientTotals);
+
+
+  router.get('/receiptList', authController.authenticateToken, authController.receiptList);
+  router.get('/receiptInfo/:receiptID', authController.authenticateToken, authController.receiptInfo);
+  router.get('/searchReceipts', authController.authenticateToken, authController.searchReceipts);
+  router.get('/receiptMetals/:receiptID', authController.authenticateToken, authController.receiptMetals);
+  router.get('/customMetals/:receiptID', authController.authenticateToken, authController.customMetals);
+  router.get('/catalyticConverters/:receiptID', authController.authenticateToken, authController.catalyticConverters);
+
+
 module.exports = router;
