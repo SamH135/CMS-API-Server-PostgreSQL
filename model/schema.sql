@@ -40,6 +40,7 @@ CREATE TABLE Receipt (
   TotalPayout DECIMAL(10, 2) CHECK (TotalPayout >= 0),
   PickupDate DATE NOT NULL,
   PickupTime TIMESTAMP NOT NULL,
+  CreatedBy VARCHAR(50) NOT NULL;
   FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
 );
 
@@ -194,3 +195,31 @@ CREATE TABLE InsulationReceiptMetals (
 );
 
 CREATE INDEX ON InsulationReceiptMetals (SteelShredWeight);
+
+
+-- Tables used for storing user input values for metal prices
+-- these prices are sent to the receipt generator when it runs
+
+-- Auto Metal Prices
+CREATE TABLE AutoMetalPrices (
+  MetalID SERIAL PRIMARY KEY,
+  MetalName VARCHAR(100) UNIQUE NOT NULL,
+  Price DECIMAL(10, 2) NOT NULL,
+  LastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- HVAC Metal Prices
+CREATE TABLE HVACMetalPrices (
+  MetalID SERIAL PRIMARY KEY,
+  MetalName VARCHAR(100) UNIQUE NOT NULL,
+  Price DECIMAL(10, 2) NOT NULL,
+  LastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insulation Metal Prices
+CREATE TABLE InsulationMetalPrices (
+  MetalID SERIAL PRIMARY KEY,
+  MetalName VARCHAR(100) UNIQUE NOT NULL,
+  Price DECIMAL(10, 2) NOT NULL,
+  LastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

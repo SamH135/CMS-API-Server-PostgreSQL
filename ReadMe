@@ -1,4 +1,4 @@
-HOW TO RUN:
+**HOW TO RUN:**
 
     - Download node.js if you don't already have it
 
@@ -24,25 +24,66 @@ HOW TO RUN:
         },
 
 
+**HOW IT WORKS**
+
+`app.js` 
+ - sets up the server as an express() app, defines cors middleware, listens for connections
+
+`db.js`
+- connects to the database, and exports the connection pool object for the rest of the app to use
+
+`package.json`
+- defines the scripts to run the app, and the dependencies for the app to run
+
+`schema.sql`
+- defines the database schema, and the tables and columns that will be used in the app
+
+`controllers/auth.js`
+- handles the database interaction logic of the app, utilizes control functions to call database queries - control functions called by `routes/auth.js`
+
+`routes/auth.js`
+- handles the routing logic of the app (API endpoints), authenticates user jwt tokens from logging in before granting access to private routes, utilizes role-based access control (RBAC) to protect certain routes that require admin users.
+
+`scheduledTasks.js` 
+- handles the scheduled tasks logic of the app, utilizes cron jobs to perform update queries 
 
 
 
-Development notes/goals:
+
+**Development notes/goals:**
 
     determine any extra features to make ready for production
 
-    need to add receipt view logic/queries - also to FE
-        - sum(receipts weights and payout) = totals on clientInfo
+    add request view/edit/search/delete logic to both auth.js files to support request pages in the front end
 
-    test cron tasks
+    create AddClient.jsx to add clients - also in FE
+    - only for 'admin' users
 
-    add createClient() to add clients
+    NOTES:
+        - sum(receipts weights and payout) = totals on clientInfo (ClientTotal and receiptTotal tables): this will come into effect when the server is set up with the receipt generating react client and is receiving receipt data over the network
+
+        - cron task needs to check for overdue pickups based on users who have a value for the avgerage time between pickup attribute
+
+
+    store data for time in between receipts (pickups) for a given client to get an accurate estimate for that value in the client database
+    - need to updated the database to reflect this
+
+    test cron tasks or create new cron tasks on render
 
     need to add logic to determine when clients need pickups based on their last pickupdate and time in between
+    - this has been done but needs to be tested, and it might be split off as a seperate project due to the fact that render allows cron projects as a service
 
-    connect last pickup to last receipt -> unless manually changed (update pickupdate)
+    connect last pickup client attribute to lastest receipt date -> unless manually changed (update pickupdate)
+    - add manual update pickup option in clientInfo and route pages
 
-    consider adding queries to make more interesting displays in front end
+
+    consider adding queries to allow for more interesting displays/searches in the ISAC front end
+
+    - search for clients by however has the highest amount of any searched metal
+
+    - have a ranking page of highest volume totals for different metals and maybe the top 10 highest volume clients overall 
+
+    - any other interesting comparisons based on the `schema.sql` file
 
 
 

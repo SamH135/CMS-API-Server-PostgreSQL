@@ -15,6 +15,7 @@ const updateNeedsPickup = async () => {
           GROUP BY ClientID
         ) r ON c.ClientID = r.ClientID
         WHERE EXTRACT(DAY FROM NOW() - COALESCE(r.LastPickupDate, c.RegistrationDate)) > c.AvgTimeBetweenPickups
+        AND c.AvgTimeBetweenPickups IS NOT NULL
       )
     `;
     await pool.query(query);
