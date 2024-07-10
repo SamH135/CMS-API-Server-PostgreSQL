@@ -48,7 +48,7 @@ app.use('*', (req, res) => {
 
 // Start the scheduled tasks - need to convert to cron 
 // DELETE eventually
-scheduleTasksStart();
+//scheduleTasksStart();
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {

@@ -1,36 +1,43 @@
-const cron = require('node-cron');
-const pool = require("./db");
+const pool = require('./db');  // Your database connection
 
-const updateNeedsPickup = async () => {
+async function updateNeedsPickup() {
+  const client = await pool.connect();
   try {
-    const query = `
-      UPDATE Client
-      SET NeedsPickup = true
-      WHERE ClientID IN (
-        SELECT c.ClientID
-        FROM Client c
-        LEFT JOIN (
-          SELECT ClientID, MAX(PickupDate) as LastPickupDate
-          FROM Receipt
-          GROUP BY ClientID
-        ) r ON c.ClientID = r.ClientID
-        WHERE EXTRACT(DAY FROM NOW() - COALESCE(r.LastPickupDate, c.RegistrationDate)) > c.AvgTimeBetweenPickups
-        AND c.AvgTimeBetweenPickups IS NOT NULL
-      )
-    `;
-    await pool.query(query);
-    console.log('Updated NeedsPickup status for clients');
-  } catch (error) {
-    console.error('Error updating NeedsPickup status:', error);
+    await client.query('BEGIN');
+
+    // Get all clients
+    const { rows: clients } = await client.query(`
+      SELECT ClientID, AvgTimeBetweenPickups, LastPickupDate
+      FROM Client
+    `);
+
+    for (const client of clients) {
+      const { ClientID, AvgTimeBetweenPickups, LastPickupDate } = client;
+      
+      if (!LastPickupDate || !AvgTimeBetweenPickups) continue;
+
+      const lastPickup = new Date(LastPickupDate);
+      const today = new Date();
+      const diffTime = Math.abs(today - lastPickup);
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      const needsPickup = diffDays >= AvgTimeBetweenPickups;
+
+      // Update the client's needsPickup status
+      await client.query(`
+        UPDATE Client
+        SET NeedsPickup = $1
+        WHERE ClientID = $2
+      `, [needsPickup, ClientID]);
+    }
+
+    await client.query('COMMIT');
+    console.log('Successfully updated NeedsPickup status for all clients');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error('Error updating NeedsPickup status:', e);
+  } finally {
+    client.release();
   }
-};
+}
 
-const scheduleTasksStart = () => {
-  // Run the task every day at midnight
-  cron.schedule('0 0 * * *', () => {
-    console.log(`[${timestamp()}] Running scheduled task: updateNeedsPickup`);
-    updateNeedsPickup();
-  });
-};
-
-module.exports = { scheduleTasksStart };
+updateNeedsPickup();
