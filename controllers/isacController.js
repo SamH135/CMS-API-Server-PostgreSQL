@@ -276,11 +276,15 @@ async function getClientMetals(clientType, clientID) {
       query = `SELECT 
         TotalDrumsRotors as "Drums & Rotors",
         TotalShortIron as "Short Iron",
-        TotalSteelShred as "Steel Shred",
-        TotalAluminumRadiators as "Aluminum Radiators",
-        TotalBrassCopperRadiators as "Brass/Copper Radiators",
-        TotalAluminum as "Aluminum",
-        TotalBatteries as "Batteries"
+        TotalShredSteel as "Shred Steel",
+        TotalAluminumBreakage as "Aluminum Breakage",
+        TotalDirtyAluminumRadiators as "Dirty Aluminum Radiators",
+        TotalWiringHarness as "Wiring Harness",
+        TotalACCompressor as "A/C Compressor",
+        TotalAlternatorStarter as "Alternator/Starter",
+        TotalAluminumRims as "Aluminum Rims",
+        TotalChromeRims as "Chrome Rims",
+        TotalBrassCopperRadiator as "Brass Copper Radiator"
       FROM AutoClientTotals WHERE ClientID = $1`;
       break;
     case 'hvac':
@@ -316,8 +320,10 @@ async function getClientTotals(clientType, clientID) {
     case 'auto':
       query = `
         SELECT act.TotalPayout, 
-               (act.TotalDrumsRotors + act.TotalShortIron + act.TotalSteelShred + act.TotalAluminumRadiators + 
-                act.TotalBrassCopperRadiators + act.TotalAluminum + act.TotalBatteries) as TotalVolume, 
+               (act.TotalDrumsRotors + act.TotalShortIron + act.TotalShredSteel + act.TotalAluminumBreakage + 
+                act.TotalDirtyAluminumRadiators + act.TotalWiringHarness + act.TotalACCompressor + 
+                act.TotalAlternatorStarter + act.TotalAluminumRims + act.TotalChromeRims + 
+                act.TotalBrassCopperRadiator) as TotalVolume, 
                c.LastPickupDate 
         FROM AutoClientTotals act
         JOIN Client c ON c.ClientID = act.ClientID
@@ -610,7 +616,19 @@ async function getUsers() {
     let query;
     switch (clientType.toLowerCase()) {
       case 'auto':
-        query = `SELECT * FROM AutoReceiptMetals WHERE ReceiptID = $1`;
+        query = `SELECT 
+          DrumsRotorsWeight as "Drums & Rotors",
+          ShortIronWeight as "Short Iron",
+          ShredSteelWeight as "Shred Steel",
+          AluminumBreakageWeight as "Aluminum Breakage",
+          DirtyAluminumRadiatorsWeight as "Dirty Aluminum Radiators",
+          WiringHarnessWeight as "Wiring Harness",
+          ACCompressorWeight as "A/C Compressor",
+          AlternatorStarterWeight as "Alternator/Starter",
+          AluminumRimsWeight as "Aluminum Rims",
+          ChromeRimsWeight as "Chrome Rims",
+          BrassCopperRadiatorWeight as "Brass Copper Radiator"
+        FROM AutoReceiptMetals WHERE ReceiptID = $1`;
         break;
       case 'hvac':
         query = `SELECT * FROM HVACReceiptMetals WHERE ReceiptID = $1`;
@@ -814,7 +832,7 @@ async function getUsers() {
         case 'steel':
           query = `
             SELECT c.ClientID, c.ClientName, 
-              COALESCE(act.TotalSteelShred, 0) + COALESCE(hct.TotalSteelShred, 0) + COALESCE(ict.TotalSteelShred, 0) as TotalSteelShred
+              COALESCE(act.TotalShredSteel, 0) + COALESCE(hct.TotalSteelShred, 0) + COALESCE(ict.TotalSteelShred, 0) as TotalSteelShred
             FROM Client c
             LEFT JOIN AutoClientTotals act ON c.ClientID = act.ClientID
             LEFT JOIN HVACClientTotals hct ON c.ClientID = hct.ClientID

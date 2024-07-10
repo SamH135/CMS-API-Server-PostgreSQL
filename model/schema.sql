@@ -40,7 +40,7 @@ CREATE TABLE Receipt (
   TotalPayout DECIMAL(10, 2) CHECK (TotalPayout >= 0),
   PickupDate DATE NOT NULL,
   PickupTime TIMESTAMP NOT NULL,
-  CreatedBy VARCHAR(50) NOT NULL;
+  CreatedBy VARCHAR(50) NOT NULL,
   FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
 );
 
@@ -75,22 +75,88 @@ CREATE TABLE Request (
 CREATE INDEX ON Request (ClientID);
 CREATE INDEX ON Request (RequestDate);
 
--- Create AutoClientTotals table - tracks running totals each client (automotive)
+
+
+
+
+
+-- Create AutoClientTotals table - tracks running totals for each client (automotive)
 CREATE TABLE AutoClientTotals (
   ClientID VARCHAR(10) PRIMARY KEY,
   TotalDrumsRotors DECIMAL(10, 2) DEFAULT 0,
   TotalShortIron DECIMAL(10, 2) DEFAULT 0,
-  TotalSteelShred DECIMAL(10, 2) DEFAULT 0,
-  TotalAluminumRadiators DECIMAL(10, 2) DEFAULT 0,
-  TotalBrassCopperRadiators DECIMAL(10, 2) DEFAULT 0,
-  TotalAluminum DECIMAL(10, 2) DEFAULT 0,
-  TotalBatteries DECIMAL(10, 2) DEFAULT 0,
+  TotalShredSteel DECIMAL(10, 2) DEFAULT 0,
+  TotalAluminumBreakage DECIMAL(10, 2) DEFAULT 0,
+  TotalDirtyAluminumRadiators DECIMAL(10, 2) DEFAULT 0,
+  TotalWiringHarness DECIMAL(10, 2) DEFAULT 0,
+  TotalACCompressor DECIMAL(10, 2) DEFAULT 0,
+  TotalAlternatorStarter DECIMAL(10, 2) DEFAULT 0,
+  TotalAluminumRims DECIMAL(10, 2) DEFAULT 0,
+  TotalChromeRims DECIMAL(10, 2) DEFAULT 0,
+  TotalBrassCopperRadiator DECIMAL(10, 2) DEFAULT 0,
   TotalPayout DECIMAL(10, 2) DEFAULT 0,
   FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
 );
 
 CREATE INDEX ON AutoClientTotals (ClientID);
 CREATE INDEX ON AutoClientTotals (TotalPayout);
+
+
+-- Create AutoReceiptMetals table - all the usual metals that appear on receipts (auto)
+CREATE TABLE AutoReceiptMetals (
+  ReceiptID INT PRIMARY KEY,
+  DrumsRotorsWeight DECIMAL(10, 2) DEFAULT 0,
+  DrumsRotorsPrice DECIMAL(10, 2) DEFAULT 0,
+  ShortIronWeight DECIMAL(10, 2) DEFAULT 0,
+  ShortIronPrice DECIMAL(10, 2) DEFAULT 0,
+  ShredSteelWeight DECIMAL(10, 2) DEFAULT 0,
+  ShredSteelPrice DECIMAL(10, 2) DEFAULT 0,
+  AluminumBreakageWeight DECIMAL(10, 2) DEFAULT 0,
+  AluminumBreakagePrice DECIMAL(10, 2) DEFAULT 0,
+  DirtyAluminumRadiatorsWeight DECIMAL(10, 2) DEFAULT 0,
+  DirtyAluminumRadiatorsPrice DECIMAL(10, 2) DEFAULT 0,
+  WiringHarnessWeight DECIMAL(10, 2) DEFAULT 0,
+  WiringHarnessPrice DECIMAL(10, 2) DEFAULT 0,
+  ACCompressorWeight DECIMAL(10, 2) DEFAULT 0,
+  ACCompressorPrice DECIMAL(10, 2) DEFAULT 0,
+  AlternatorStarterWeight DECIMAL(10, 2) DEFAULT 0,
+  AlternatorStarterPrice DECIMAL(10, 2) DEFAULT 0,
+  AluminumRimsWeight DECIMAL(10, 2) DEFAULT 0,
+  AluminumRimsPrice DECIMAL(10, 2) DEFAULT 0,
+  ChromeRimsWeight DECIMAL(10, 2) DEFAULT 0,
+  ChromeRimsPrice DECIMAL(10, 2) DEFAULT 0,
+  BrassCopperRadiatorWeight DECIMAL(10, 2) DEFAULT 0,
+  BrassCopperRadiatorPrice DECIMAL(10, 2) DEFAULT 0,
+  FOREIGN KEY (ReceiptID) REFERENCES Receipt(ReceiptID)
+);
+
+CREATE INDEX ON AutoReceiptMetals (ReceiptID);
+
+
+-- Create SetAutoPrices table - stores predefined prices for auto metals that admins can set
+CREATE TABLE SetAutoPrices (
+  PriceID SERIAL PRIMARY KEY,
+  EffectiveDate DATE NOT NULL,
+  DrumsRotorsPrice DECIMAL(10, 2) NOT NULL,
+  ShortIronPrice DECIMAL(10, 2) NOT NULL,
+  ShredSteelPrice DECIMAL(10, 2) NOT NULL,
+  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL,
+  DirtyAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL,
+  WiringHarnessPrice DECIMAL(10, 2) NOT NULL,
+  ACCompressorPrice DECIMAL(10, 2) NOT NULL,
+  AlternatorStarterPrice DECIMAL(10, 2) NOT NULL,
+  AluminumRimsPrice DECIMAL(10, 2) NOT NULL,
+  ChromeRimsPrice DECIMAL(10, 2) NOT NULL,
+  BrassCopperRadiatorPrice DECIMAL(10, 2) NOT NULL
+);
+
+CREATE INDEX ON SetAutoPrices (EffectiveDate);
+
+
+
+
+
+
 
 -- Create HVACClientTotals table - tracks running totals each client (hvac)
 CREATE TABLE HVACClientTotals (
@@ -136,27 +202,10 @@ CREATE TABLE CatalyticConverter (
 CREATE INDEX ON CatalyticConverter (ReceiptID);
 CREATE INDEX ON CatalyticConverter (PartNumber);
 
--- Create AutoReceiptMetals table - all the usual metals that appear on receipts (auto)
-CREATE TABLE AutoReceiptMetals (
-  ReceiptID INT PRIMARY KEY,
-  DrumsRotorsWeight DECIMAL(10, 2) DEFAULT 0,
-  DrumsRotorsPrice DECIMAL(10, 2) DEFAULT 0,
-  ShortIronWeight DECIMAL(10, 2) DEFAULT 0,
-  ShortIronPrice DECIMAL(10, 2) DEFAULT 0,
-  SteelShredWeight DECIMAL(10, 2) DEFAULT 0,
-  SteelShredPrice DECIMAL(10, 2) DEFAULT 0,
-  AluminumRadiatorsWeight DECIMAL(10, 2) DEFAULT 0,
-  AluminumRadiatorsPrice DECIMAL(10, 2) DEFAULT 0,
-  BrassCopperRadiatorsWeight DECIMAL(10, 2) DEFAULT 0,
-  BrassCopperRadiatorsPrice DECIMAL(10, 2) DEFAULT 0,
-  AluminumWeight DECIMAL(10, 2) DEFAULT 0,
-  AluminumPrice DECIMAL(10, 2) DEFAULT 0,
-  BatteriesWeight DECIMAL(10, 2) DEFAULT 0,
-  BatteriesPrice DECIMAL(10, 2) DEFAULT 0,
-  FOREIGN KEY (ReceiptID) REFERENCES Receipt(ReceiptID)
-);
 
-CREATE INDEX ON AutoReceiptMetals (DrumsRotorsWeight, ShortIronWeight, SteelShredWeight, AluminumRadiatorsWeight, BrassCopperRadiatorsWeight, AluminumWeight, BatteriesWeight);
+
+
+
 
 -- Create HVACReceiptMetals table - all the usual metals that appear on receipts (hvac)
 CREATE TABLE HVACReceiptMetals (
@@ -200,26 +249,3 @@ CREATE INDEX ON InsulationReceiptMetals (SteelShredWeight);
 -- Tables used for storing user input values for metal prices
 -- these prices are sent to the receipt generator when it runs
 
--- Auto Metal Prices
-CREATE TABLE AutoMetalPrices (
-  MetalID SERIAL PRIMARY KEY,
-  MetalName VARCHAR(100) UNIQUE NOT NULL,
-  Price DECIMAL(10, 2) NOT NULL,
-  LastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- HVAC Metal Prices
-CREATE TABLE HVACMetalPrices (
-  MetalID SERIAL PRIMARY KEY,
-  MetalName VARCHAR(100) UNIQUE NOT NULL,
-  Price DECIMAL(10, 2) NOT NULL,
-  LastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- Insulation Metal Prices
-CREATE TABLE InsulationMetalPrices (
-  MetalID SERIAL PRIMARY KEY,
-  MetalName VARCHAR(100) UNIQUE NOT NULL,
-  Price DECIMAL(10, 2) NOT NULL,
-  LastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);

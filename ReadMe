@@ -38,14 +38,9 @@
 `schema.sql`
 - defines the database schema, and the tables and columns that will be used in the app
 
-`controllers/auth.js`
-- handles the database interaction logic of the app, utilizes control functions to call database queries - control functions called by `routes/auth.js`
+...
 
-`routes/auth.js`
-- handles the routing logic of the app (API endpoints), authenticates user jwt tokens from logging in before granting access to private routes, utilizes role-based access control (RBAC) to protect certain routes that require admin users.
-
-`scheduledTasks.js` 
-- handles the scheduled tasks logic of the app, utilizes cron jobs to perform update queries 
+NEED TO UPDATE THIS WITH FINAL FILE STRUCTURE
 
 
 
@@ -54,10 +49,12 @@
 
     determine any extra features to make ready for production
 
-    add request view/edit/search/delete logic to both auth.js files to support request pages in the front end
+    improve/add request view/edit/search/delete logic to control files to support request pages in the front end
 
-    create AddClient.jsx to add clients - also in FE
+    create AddClient controllers in isacController to add clients - also in FE
     - only for 'admin' users
+
+    create setMetalPrices Interface - db needs to reflect this properly
 
     NOTES:
         - sum(receipts weights and payout) = totals on clientInfo (ClientTotal and receiptTotal tables): this will come into effect when the server is set up with the receipt generating react client and is receiving receipt data over the network
@@ -76,6 +73,8 @@
     connect last pickup client attribute to lastest receipt date -> unless manually changed (update pickupdate)
     - add manual update pickup option in clientInfo and route pages
 
+
+OPTIONAL/EXTRA:
 
     consider adding queries to allow for more interesting displays/searches in the ISAC front end
 
