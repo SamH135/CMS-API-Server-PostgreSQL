@@ -36,7 +36,7 @@ router.get('/requests', asyncHandler(isacController.getRequests));
 router.get('/requests/:requestID', asyncHandler(isacController.getRequestById));
 router.post('/requests', asyncHandler(isacController.createRequest));
 router.put('/requests/:requestID', asyncHandler(isacController.updateRequest));
-router.delete('/requests/:requestID', asyncHandler(isacController.deleteRequest));
+router.delete('/deleteRequests', asyncHandler(isacController.deleteMultipleRequests));
 
 // Admin-only routes
 router.use(authorizeRole('admin'));

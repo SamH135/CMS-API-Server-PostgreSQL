@@ -828,28 +828,38 @@ async function getUsers() {
   };
   
   exports.deleteRequest = async (req, res) => {
-    const { searchTerm } = req.query;
+    const { requestID } = req.params;
     try {
-      let query = `
-        DELETE FROM Request
-        WHERE RequestID IN (
-          SELECT r.RequestID
-          FROM Request r
-          JOIN Client c ON r.ClientID = c.ClientID
-          WHERE c.ClientName ILIKE $1
-          OR c.ClientID ILIKE $1
-          OR c.ClientLocation ILIKE $1
-          OR r.RequestID::text ILIKE $1
-        )
-        RETURNING *
-      `;
-      const { rows } = await pool.query(query, [`%${searchTerm}%`]);
-      if (rows.length === 0) {
-        return res.status(404).json({ message: 'No matching requests found' });
+      const { rowCount } = await pool.query('DELETE FROM Request WHERE RequestID = $1', [requestID]);
+      if (rowCount === 0) {
+        return res.status(404).json({ message: 'Request not found' });
       }
-      res.status(200).json({ message: `${rows.length} request(s) deleted successfully`, deletedRequests: rows });
+      res.status(200).json({ message: 'Request deleted successfully' });
     } catch (error) {
-      console.error('Error deleting request(s):', error);
+      console.error('Error deleting request:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };
+  
+  exports.deleteMultipleRequests = async (req, res) => {
+    const { requestIDs } = req.body;
+    if (!Array.isArray(requestIDs) || requestIDs.length === 0) {
+      return res.status(400).json({ message: 'Invalid request IDs' });
+    }
+  
+    try {
+      const placeholders = requestIDs.map((_, index) => `$${index + 1}`).join(', ');
+      const query = `DELETE FROM Request WHERE RequestID IN (${placeholders})`;
+      
+      const { rowCount } = await pool.query(query, requestIDs);
+      
+      if (rowCount === 0) {
+        return res.status(404).json({ message: 'No requests found' });
+      }
+      
+      res.status(200).json({ message: `${rowCount} request(s) deleted successfully` });
+    } catch (error) {
+      console.error('Error deleting multiple requests:', error);
       res.status(500).json({ message: 'Internal Server Error' });
     }
   };
@@ -891,7 +901,7 @@ async function getUsers() {
             LIMIT $1
           `;
           break;
-          
+
       // Add more cases for other metals
       default:
         return res.status(400).json({ message: 'Invalid metal type' });
