@@ -289,21 +289,20 @@ async function getClientMetals(clientType, clientID) {
       break;
     case 'hvac':
       query = `SELECT 
-        TotalSteelShred as "Steel Shred",
-        TotalCopper as "Copper",
-        TotalBrass as "Brass",
+        TotalShredSteel as "Shred Steel",
+        TotalDirtyAlumCopperRadiators as "Dirty Alum/Copper Radiators",
+        TotalCleanAluminumRadiators as "Clean Aluminum Radiators",
+        TotalCopperTwo as "#2 Copper",
         TotalCompressors as "Compressors",
-        TotalCopperCoils as "Copper Coils",
-        TotalAluminumCoils as "Aluminum Coils",
-        TotalWire as "Wire",
-        TotalBrassCopperBreakage as "Brass/Copper Breakage",
-        TotalElectricMotors as "Electric Motors"
+        TotalDirtyBrass as "Dirty Brass",
+        TotalElectricMotors as "Electric Motors",
+        TotalAluminumBreakage as "Aluminum Breakage"
       FROM HVACClientTotals WHERE ClientID = $1`;
       break;
     case 'insulation':
       query = `SELECT 
-        TotalSteelShred as "Steel Shred",
-        TotalLoadsOfTrash as "Loads of Trash"
+        TotalDumpFees as "Dump Fees",
+        TotalHaulFees as "Haul Fees"
       FROM InsulationClientTotals WHERE ClientID = $1`;
       break;
     default:
@@ -333,10 +332,10 @@ async function getClientTotals(clientType, clientID) {
     case 'hvac':
       query = `
         SELECT hct.TotalPayout, 
-               (hct.TotalSteelShred + hct.TotalCopper + hct.TotalBrass + hct.TotalCompressors + 
-                hct.TotalCopperCoils + hct.TotalAluminumCoils + hct.TotalWire + 
-                hct.TotalBrassCopperBreakage + hct.TotalElectricMotors) as TotalVolume, 
-               c.LastPickupDate 
+                (hct.TotalShredSteel + hct.TotalDirtyAlumCopperRadiators + hct.TotalCleanAluminumRadiators + 
+                hct.TotalCopperTwo + hct.TotalCompressors + hct.TotalDirtyBrass + 
+                hct.TotalElectricMotors + hct.TotalAluminumBreakage) as TotalVolume, 
+                c.LastPickupDate 
         FROM HVACClientTotals hct
         JOIN Client c ON c.ClientID = hct.ClientID
         WHERE hct.ClientID = $1
@@ -344,9 +343,9 @@ async function getClientTotals(clientType, clientID) {
       break;
     case 'insulation':
       query = `
-        SELECT ict.TotalPayout, 
-               (ict.TotalSteelShred + ict.TotalLoadsOfTrash) as TotalVolume, 
-               c.LastPickupDate 
+        SELECT ict.TotalDumpFees + ict.TotalHaulFees as TotalPayout, 
+                0 as TotalVolume, 
+                c.LastPickupDate 
         FROM InsulationClientTotals ict
         JOIN Client c ON c.ClientID = ict.ClientID
         WHERE ict.ClientID = $1
@@ -457,6 +456,34 @@ async function getUsers() {
     `, [`%${term}%`]);
     return rows;
   }
+
+
+
+  /*******************************************************
+ *                        Prices                         *
+ *                                                       *
+ *       Functions for price set/get operations          *
+ *******************************************************/
+  async function getHVACPrices() {
+    const query = `
+      SELECT * FROM SetHVACPrices
+      WHERE EffectiveDate <= CURRENT_DATE
+      ORDER BY EffectiveDate DESC
+      LIMIT 1
+    `;
+    const { rows } = await pool.query(query);
+    return rows[0] || null;
+  }
+  
+  exports.getHVACPrices = async (req, res) => {
+    try {
+      const prices = await getHVACPrices();
+      res.status(200).json({ prices });
+    } catch (error) {
+      console.error('Error retrieving HVAC prices:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };
 
 
 
@@ -631,10 +658,22 @@ async function getUsers() {
         FROM AutoReceiptMetals WHERE ReceiptID = $1`;
         break;
       case 'hvac':
-        query = `SELECT * FROM HVACReceiptMetals WHERE ReceiptID = $1`;
+        query = `SELECT 
+          ShredSteelWeight as "Shred Steel",
+          DirtyAlumCopperRadiatorsWeight as "Dirty Alum/Copper Radiators",
+          CleanAluminumRadiatorsWeight as "Clean Aluminum Radiators",
+          CopperTwoWeight as "#2 Copper",
+          CompressorsWeight as "Compressors",
+          DirtyBrassWeight as "Dirty Brass",
+          ElectricMotorsWeight as "Electric Motors",
+          AluminumBreakageWeight as "Aluminum Breakage"
+        FROM HVACReceiptMetals WHERE ReceiptID = $1`;
         break;
       case 'insulation':
-        query = `SELECT * FROM InsulationReceiptMetals WHERE ReceiptID = $1`;
+        query = `SELECT 
+          DumpFee as "Dump Fee",
+          HaulFee as "Haul Fee"
+        FROM InsulationReceiptMetals WHERE ReceiptID = $1`;
         break;
       default:
         throw new Error('Invalid client type: ' + clientType);
@@ -829,28 +868,30 @@ async function getUsers() {
     try {
       let query;
       switch (metal.toLowerCase()) {
-        case 'steel':
+
+        case 'shredsteel':
           query = `
             SELECT c.ClientID, c.ClientName, 
-              COALESCE(act.TotalShredSteel, 0) + COALESCE(hct.TotalSteelShred, 0) + COALESCE(ict.TotalSteelShred, 0) as TotalSteelShred
+              COALESCE(act.TotalShredSteel, 0) + COALESCE(hct.TotalShredSteel, 0) as TotalShredSteel
             FROM Client c
             LEFT JOIN AutoClientTotals act ON c.ClientID = act.ClientID
             LEFT JOIN HVACClientTotals hct ON c.ClientID = hct.ClientID
-            LEFT JOIN InsulationClientTotals ict ON c.ClientID = ict.ClientID
-            ORDER BY TotalSteelShred DESC
+            ORDER BY TotalShredSteel DESC
             LIMIT $1
           `;
           break;
+
         case 'copper':
           query = `
             SELECT c.ClientID, c.ClientName, 
-              COALESCE(hct.TotalCopper, 0) + COALESCE(hct.TotalCopperCoils, 0) as TotalCopper
+              COALESCE(hct.TotalCopperTwo, 0) as TotalCopper
             FROM Client c
             LEFT JOIN HVACClientTotals hct ON c.ClientID = hct.ClientID
-          ORDER BY TotalCopper DESC
-          LIMIT $1
-        `;
-        break;
+            ORDER BY TotalCopper DESC
+            LIMIT $1
+          `;
+          break;
+          
       // Add more cases for other metals
       default:
         return res.status(400).json({ message: 'Invalid metal type' });

@@ -77,7 +77,7 @@ CREATE INDEX ON Request (RequestDate);
 
 
 
-
+-- AUTOMOTIVE
 
 
 -- Create AutoClientTotals table - tracks running totals for each client (automotive)
@@ -134,6 +134,7 @@ CREATE INDEX ON AutoReceiptMetals (ReceiptID);
 
 
 -- Create SetAutoPrices table - stores predefined prices for auto metals that admins can set
+-- prices will be sent to the RGC to create receipts
 CREATE TABLE SetAutoPrices (
   PriceID SERIAL PRIMARY KEY,
   EffectiveDate DATE NOT NULL,
@@ -153,42 +154,6 @@ CREATE TABLE SetAutoPrices (
 CREATE INDEX ON SetAutoPrices (EffectiveDate);
 
 
-
-
-
-
-
--- Create HVACClientTotals table - tracks running totals each client (hvac)
-CREATE TABLE HVACClientTotals (
-  ClientID VARCHAR(10) PRIMARY KEY,
-  TotalSteelShred DECIMAL(10, 2) DEFAULT 0,
-  TotalCopper DECIMAL(10, 2) DEFAULT 0,
-  TotalBrass DECIMAL(10, 2) DEFAULT 0,
-  TotalCompressors DECIMAL(10, 2) DEFAULT 0,
-  TotalCopperCoils DECIMAL(10, 2) DEFAULT 0,
-  TotalAluminumCoils DECIMAL(10, 2) DEFAULT 0,
-  TotalWire DECIMAL(10, 2) DEFAULT 0,
-  TotalBrassCopperBreakage DECIMAL(10, 2) DEFAULT 0,
-  TotalElectricMotors DECIMAL(10, 2) DEFAULT 0,
-  TotalPayout DECIMAL(10, 2) DEFAULT 0,
-  FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
-);
-
-CREATE INDEX ON HVACClientTotals (ClientID);
-CREATE INDEX ON HVACClientTotals (TotalPayout);
-
--- Create InsulationClientTotals table - tracks running totals each client (insulation)
-CREATE TABLE InsulationClientTotals (
-  ClientID VARCHAR(10) PRIMARY KEY,
-  TotalSteelShred DECIMAL(10, 2) DEFAULT 0,
-  TotalLoadsOfTrash INT DEFAULT 0,
-  TotalPayout DECIMAL(10, 2) DEFAULT 0,
-  FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
-);
-
-CREATE INDEX ON InsulationClientTotals (TotalPayout);
-CREATE INDEX ON InsulationClientTotals (TotalPayout);
-
 -- Create CatalyticConverter table - tracks detailed catalytic info 
 CREATE TABLE CatalyticConverter (
   ConverterID SERIAL PRIMARY KEY,
@@ -206,46 +171,93 @@ CREATE INDEX ON CatalyticConverter (PartNumber);
 
 
 
+-- HVAC
+
+
+-- Create HVACClientTotals table - tracks running totals each client (hvac)
+CREATE TABLE HVACClientTotals (
+  ClientID VARCHAR(10) PRIMARY KEY,
+  TotalShredSteel DECIMAL(10, 2) DEFAULT 0,
+  TotalDirtyAlumCopperRadiators DECIMAL(10, 2) DEFAULT 0,
+  TotalCleanAluminumRadiators DECIMAL(10, 2) DEFAULT 0,
+  TotalCopperTwo DECIMAL(10, 2) DEFAULT 0,
+  TotalCompressors DECIMAL(10, 2) DEFAULT 0,
+  TotalDirtyBrass DECIMAL(10, 2) DEFAULT 0,
+  TotalElectricMotors DECIMAL(10, 2) DEFAULT 0,
+  TotalAluminumBreakage DECIMAL(10, 2) DEFAULT 0,
+  TotalPayout DECIMAL(10, 2) DEFAULT 0,
+  FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
+);
+
+CREATE INDEX ON HVACClientTotals (ClientID);
+CREATE INDEX ON HVACClientTotals (TotalPayout);
+
+
 
 -- Create HVACReceiptMetals table - all the usual metals that appear on receipts (hvac)
 CREATE TABLE HVACReceiptMetals (
   ReceiptID INT PRIMARY KEY,
-  SteelShredWeight DECIMAL(10, 2) DEFAULT 0,
-  SteelShredPrice DECIMAL(10, 2) DEFAULT 0,
-  CopperWeight DECIMAL(10, 2) DEFAULT 0,
-  CopperPrice DECIMAL(10, 2) DEFAULT 0,
-  BrassWeight DECIMAL(10, 2) DEFAULT 0,
-  BrassPrice DECIMAL(10, 2) DEFAULT 0,
+  ShredSteelWeight DECIMAL(10, 2) DEFAULT 0,
+  ShredSteelPrice DECIMAL(10, 2) DEFAULT 0,
+  DirtyAlumCopperRadiatorsWeight DECIMAL(10, 2) DEFAULT 0,
+  DirtyAlumCopperRadiatorsPrice DECIMAL(10, 2) DEFAULT 0,
+  CleanAluminumRadiatorsWeight DECIMAL(10, 2) DEFAULT 0,
+  CleanAluminumRadiatorsPrice DECIMAL(10, 2) DEFAULT 0,
+  CopperTwoWeight DECIMAL(10, 2) DEFAULT 0,
+  CopperTwoPrice DECIMAL(10, 2) DEFAULT 0,
   CompressorsWeight DECIMAL(10, 2) DEFAULT 0,
   CompressorsPrice DECIMAL(10, 2) DEFAULT 0,
-  CopperCoilsWeight DECIMAL(10, 2) DEFAULT 0,
-  CopperCoilsPrice DECIMAL(10, 2) DEFAULT 0,
-  AluminumCoilsWeight DECIMAL(10, 2) DEFAULT 0,
-  AluminumCoilsPrice DECIMAL(10, 2) DEFAULT 0,
-  WireWeight DECIMAL(10, 2) DEFAULT 0,
-  WirePrice DECIMAL(10, 2) DEFAULT 0,
-  BrassCopperBreakageWeight DECIMAL(10, 2) DEFAULT 0,
-  BrassCopperBreakagePrice DECIMAL(10, 2) DEFAULT 0,
+  DirtyBrassWeight DECIMAL(10, 2) DEFAULT 0,
+  DirtyBrassPrice DECIMAL(10, 2) DEFAULT 0,
   ElectricMotorsWeight DECIMAL(10, 2) DEFAULT 0,
   ElectricMotorsPrice DECIMAL(10, 2) DEFAULT 0,
+  AluminumBreakageWeight DECIMAL(10, 2) DEFAULT 0,
+  AluminumBreakagePrice DECIMAL(10, 2) DEFAULT 0,
   FOREIGN KEY (ReceiptID) REFERENCES Receipt(ReceiptID)
 );
 
-CREATE INDEX ON HVACReceiptMetals (SteelShredWeight, CopperWeight, BrassWeight, CompressorsWeight, CopperCoilsWeight, AluminumCoilsWeight, WireWeight, BrassCopperBreakageWeight, ElectricMotorsWeight);
+CREATE INDEX ON HVACReceiptMetals (ReceiptID);
 
--- Create InsulationReceiptMetals table - all the usual metals that appear on receipts (insulation)
+
+-- Create SetHVACPrices table - stores predefined prices for hvac metals that admins can set
+-- prices will be sent to the RGC to create receipts
+CREATE TABLE SetHVACPrices (
+  PriceID SERIAL PRIMARY KEY,
+  EffectiveDate DATE NOT NULL,
+  ShredSteelPrice DECIMAL(10, 2) NOT NULL,
+  DirtyAlumCopperRadiatorsPrice DECIMAL(10, 2) NOT NULL,
+  CleanAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL,
+  CopperTwoPrice DECIMAL(10, 2) NOT NULL,
+  CompressorsPrice DECIMAL(10, 2) NOT NULL,
+  DirtyBrassPrice DECIMAL(10, 2) NOT NULL,
+  ElectricMotorsPrice DECIMAL(10, 2) NOT NULL,
+  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL
+);
+
+CREATE INDEX ON SetHVACPrices (EffectiveDate);
+
+
+-- INSULATION
+
+
+-- Modified InsulationClientTotals table
+CREATE TABLE InsulationClientTotals (
+  ClientID VARCHAR(10) PRIMARY KEY,
+  TotalDumpFees DECIMAL(10, 2) DEFAULT 0,
+  TotalHaulFees DECIMAL(10, 2) DEFAULT 0,
+  FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
+);
+
+CREATE INDEX ON InsulationClientTotals (ClientID);
+
+-- Modified InsulationReceiptMetals table
 CREATE TABLE InsulationReceiptMetals (
   ReceiptID INT PRIMARY KEY,
-  SteelShredWeight DECIMAL(10, 2) DEFAULT 0,
-  SteelShredPrice DECIMAL(10, 2) DEFAULT 0,
-  LoadsOfTrash INT DEFAULT 0,
-  LoadsOfTrashPrice DECIMAL(10, 2) DEFAULT 0,
+  DumpFee DECIMAL(10, 2) DEFAULT 0,
+  HaulFee DECIMAL(10, 2) DEFAULT 0,
   FOREIGN KEY (ReceiptID) REFERENCES Receipt(ReceiptID)
 );
 
-CREATE INDEX ON InsulationReceiptMetals (SteelShredWeight);
+CREATE INDEX ON InsulationReceiptMetals (ReceiptID);
 
-
--- Tables used for storing user input values for metal prices
--- these prices are sent to the receipt generator when it runs
 
