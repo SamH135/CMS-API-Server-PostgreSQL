@@ -398,13 +398,22 @@ exports.editUser = async (req, res) => {
 };
 
 exports.updateUser = async (req, res) => {
-  const { userID, username, userType } = req.body;
+  const { userid, username, usertype } = req.body;
+  console.log('Received update request:', req.body);
+
   try {
-    await updateUserInfo(userID, username, userType);
-    res.status(200).json({ message: 'User updated successfully' });
+    if (!userid) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    const updatedUser = await updateUserInfo(userid, username, usertype);
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ message: 'User updated successfully', user: updatedUser });
   } catch (error) {
     console.error('Error updating user:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 };
 
@@ -442,7 +451,39 @@ async function getUsers() {
   }
   
   async function updateUserInfo(userID, username, userType) {
-    await pool.query('UPDATE "User" SET Username = $1, UserType = $2 WHERE UserID = $3', [username, userType, userID]);
+    console.log(`Updating user: ID=${userID}, Username=${username}, UserType=${userType}`);
+    if (!userID) {
+      throw new Error('User ID is required');
+    }
+    const updateFields = [];
+    const values = [];
+    let paramCount = 1;
+  
+    if (username !== undefined) {
+      updateFields.push(`Username = $${paramCount}`);
+      values.push(username);
+      paramCount++;
+    }
+  
+    if (userType !== undefined) {
+      updateFields.push(`UserType = $${paramCount}`);
+      values.push(userType);
+      paramCount++;
+    }
+  
+    if (updateFields.length === 0) {
+      throw new Error('No fields to update');
+    }
+  
+    values.push(userID);
+    const query = `UPDATE "User" SET ${updateFields.join(', ')} WHERE UserID = $${paramCount} RETURNING *`;
+    
+    console.log('Executing query:', query);
+    console.log('With values:', values);
+  
+    const result = await pool.query(query, values);
+    console.log('Update result:', result.rows[0]);
+    return result.rows[0];
   }
   
   async function deleteUser(userID) {
