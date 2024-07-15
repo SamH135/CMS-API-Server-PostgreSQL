@@ -153,8 +153,13 @@ exports.updateClient = async (req, res) => {
 
 exports.pickupInfo = async (req, res) => {
   try {
-    const clients = await getClientsWithPickupInfo();
-    res.status(200).json({ clients });
+    const { rows } = await pool.query(`
+      SELECT ClientID as clientid, ClientName as clientname, ClientLocation as clientlocation, 
+             LastPickupDate as lastpickupdate, NeedsPickup as needspickup
+      FROM Client
+      ORDER BY LastPickupDate DESC
+    `);
+    res.status(200).json({ clients: rows });
   } catch (error) {
     console.error('Error retrieving pickup information:', error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -505,6 +510,8 @@ async function getUsers() {
  *                                                       *
  *       Functions for price set/get operations          *
  *******************************************************/
+
+
   async function getHVACPrices() {
     const query = `
       SELECT * FROM SetHVACPrices
@@ -536,6 +543,7 @@ async function getUsers() {
    *    Functions for receipt-related operations         *
    *******************************************************/
   
+
   exports.receiptList = async (req, res) => {
     try {
       const { term, date } = req.query;
@@ -750,6 +758,27 @@ async function getUsers() {
     return rows[0];
   }
   
+  exports.getReceiptByClientAndDate = async (req, res) => {
+    const { clientId, date } = req.query;
+    try {
+      const { rows } = await pool.query(`
+        SELECT ReceiptID
+        FROM Receipt
+        WHERE ClientID = $1 AND PickupDate::date = $2::date
+        ORDER BY PickupTime DESC
+        LIMIT 1
+      `, [clientId, date]);
+      
+      if (rows.length > 0) {
+        res.status(200).json({ receipt: rows[0] });
+      } else {
+        res.status(404).json({ message: 'No receipt found for this client and date' });
+      }
+    } catch (error) {
+      console.error('Error fetching receipt:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };
 
 
 

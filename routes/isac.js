@@ -30,6 +30,7 @@ router.get('/searchReceipts', asyncHandler(isacController.searchReceipts));
 router.get('/receiptMetals/:receiptID', asyncHandler(isacController.receiptMetals));
 router.get('/customMetals/:receiptID', asyncHandler(isacController.customMetals));
 router.get('/catalyticConverters/:receiptID', asyncHandler(isacController.catalyticConverters));
+router.get('/getReceiptByClientAndDate', asyncHandler(isacController.getReceiptByClientAndDate));
 
 // Request routes
 router.get('/requests', asyncHandler(isacController.getRequests));
