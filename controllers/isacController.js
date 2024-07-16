@@ -208,6 +208,63 @@ exports.getClientTotals = async (req, res) => {
   }
 };
 
+
+exports.addClient = async (req, res) => {
+  const {
+    clientname,
+    clientlocation,
+    clienttype,
+    avgtimebetweenpickups,
+    locationnotes,
+    locationcontact,
+    paymentmethod
+  } = req.body;
+
+  try {
+    // Start a transaction
+    await pool.query('BEGIN');
+
+    // Insert new client
+    const clientQuery = `
+      INSERT INTO Client (
+        ClientName, ClientLocation, ClientType, AvgTimeBetweenPickups,
+        LocationNotes, LocationContact, PaymentMethod
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING ClientID
+    `;
+    const { rows } = await pool.query(clientQuery, [
+      clientname, clientlocation, clienttype, avgtimebetweenpickups,
+      locationnotes, locationcontact, paymentmethod
+    ]);
+
+    const clientID = rows[0].clientid;
+
+    // Initialize client totals based on client type
+    let totalsQuery;
+    if (clienttype === 'auto') {
+      totalsQuery = 'INSERT INTO AutoClientTotals (ClientID) VALUES ($1)';
+    } else if (clienttype === 'hvac') {
+      totalsQuery = 'INSERT INTO HVACClientTotals (ClientID) VALUES ($1)';
+    } else if (clienttype === 'insulation') {
+      totalsQuery = 'INSERT INTO InsulationClientTotals (ClientID) VALUES ($1)';
+    }
+    
+    if (totalsQuery) {
+      await pool.query(totalsQuery, [clientID]);
+    }
+
+    // Commit the transaction
+    await pool.query('COMMIT');
+
+    res.status(201).json({ success: true, message: 'Client added successfully', clientID });
+  } catch (error) {
+    // Rollback in case of error
+    await pool.query('ROLLBACK');
+    console.error('Error adding client:', error);
+    res.status(500).json({ success: false, message: 'An error occurred while adding the client' });
+  }
+};
+
 // Helper functions for client operations
 async function getClients() {
   const { rows } = await pool.query('SELECT * FROM Client');

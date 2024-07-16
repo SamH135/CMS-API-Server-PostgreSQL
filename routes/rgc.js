@@ -19,10 +19,10 @@ router.get('/userList', rgcController.getUsers);
 router.post('/createUser', rgcController.createUser);
 router.get('/clientList', rgcController.clientList);
 router.get('/searchClients', rgcController.searchClients);
-
-// unused
 router.get('/metal-prices', asyncHandler(rgcController.getMetalPrices));
 router.post('/receipts', asyncHandler(rgcController.createReceipt));
-router.get('/daily-totals', asyncHandler(rgcController.getDailyTotals));
+
+// unused
+//router.get('/daily-totals', asyncHandler(rgcController.getDailyTotals));
 
 module.exports = router;

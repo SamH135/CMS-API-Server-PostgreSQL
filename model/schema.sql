@@ -1,6 +1,6 @@
 -- Create Client table
 CREATE TABLE Client (
-  ClientID VARCHAR(10) PRIMARY KEY,
+  ClientID SERIAL PRIMARY KEY,
   ClientName VARCHAR(100) NOT NULL,
   ClientLocation VARCHAR(200) NOT NULL,
   ClientType VARCHAR(50) NOT NULL,

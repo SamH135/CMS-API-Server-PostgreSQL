@@ -63,6 +63,7 @@ exports.createUser = async (req, res) => {
 exports.clientList = async (req, res) => {
   try {
     const clients = await getClients();
+    console.log("Sending client list:", clients); // Add this log for debugging
     res.status(200).json({ clients });
   } catch (error) {
     console.error('Error retrieving clients:', error);
@@ -74,6 +75,7 @@ exports.searchClients = async (req, res) => {
   const { term } = req.query;
   try {
     const clients = await searchClientsByTerm(term);
+    console.log("Sending search results:", clients); // Add this log for debugging
     res.status(200).json({ clients });
   } catch (error) {
     console.error('Error searching clients:', error);
@@ -81,48 +83,112 @@ exports.searchClients = async (req, res) => {
   }
 };
 
+
 // Helper functions
 async function getClients() {
-  const { rows } = await pool.query('SELECT ClientID, ClientName, ClientLocation FROM Client');
+  const { rows } = await pool.query('SELECT ClientID, ClientName, ClientLocation, ClientType FROM Client');
+  console.log("Fetched clients:", rows); // Add this log for debugging
   return rows;
 }
 
 async function searchClientsByTerm(term) {
   const { rows } = await pool.query(`
-    SELECT ClientID, ClientName, ClientLocation 
+    SELECT ClientID, ClientName, ClientLocation, ClientType
     FROM Client
     WHERE ClientName ILIKE $1 OR ClientID::text ILIKE $1 OR ClientLocation ILIKE $1
   `, [`%${term}%`]);
+  console.log("Search results:", rows); // Add this log for debugging
   return rows;
 }
 
 
+
+
+
+
+
 exports.getMetalPrices = async (req, res) => {
+  console.log("Backend - getMetalPrices called with query:", req.query);
   const { clientType } = req.query;
   try {
     let query;
+    let table;
     switch (clientType.toLowerCase()) {
       case 'auto':
-        query = 'SELECT * FROM AutoMetalPrices';
+        table = 'SetAutoPrices';
         break;
       case 'hvac':
-        query = 'SELECT * FROM HVACMetalPrices';
-        break;
-      case 'insulation':
-        query = 'SELECT * FROM InsulationMetalPrices';
+        table = 'SetHVACPrices';
         break;
       default:
+        console.log("Backend - Invalid client type:", clientType);
         return res.status(400).json({ message: 'Invalid client type' });
     }
+
+    query = `
+      SELECT * FROM ${table}
+      WHERE EffectiveDate <= CURRENT_DATE
+      ORDER BY EffectiveDate DESC
+      LIMIT 1
+    `;
+
+    console.log("Backend - Executing query:", query);
     const { rows } = await pool.query(query);
-    res.json(rows);
+    console.log("Backend - Query result:", rows);
+
+    if (rows.length === 0) {
+      console.log("Backend - No prices found for the given client type");
+      return res.status(404).json({ message: 'No prices found for the given client type' });
+    }
+
+    // Format the metal names and exclude the PriceID
+    const formattedPrices = {};
+    Object.entries(rows[0]).forEach(([key, value]) => {
+      if (key !== 'priceid' && key !== 'effectivedate') {
+        const formattedKey = key.replace(/price$/i, '')
+                                .split(/(?=[A-Z])/)
+                                .join(' ')
+                                .toLowerCase()
+                                .replace(/\b\w/g, l => l.toUpperCase());
+        formattedPrices[formattedKey] = value;
+      }
+    });
+
+    console.log("Backend - Sending formatted response:", formattedPrices);
+    res.json(formattedPrices);
   } catch (error) {
+    console.error('Backend - Error fetching metal prices:', error);
     res.status(500).json({ message: 'Error fetching metal prices' });
   }
 };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 exports.createReceipt = async (req, res) => {
-  const { clientID, createdBy, totalPayout, metals, catalyticConverters, userDefinedMetals } = req.body;
+  const { 
+    clientID, 
+    createdBy, 
+    totalPayout, 
+    totalVolume,
+    metals, 
+    userDefinedMetals, 
+    catalyticConverters 
+  } = req.body;
+
   const client = await pool.query('SELECT * FROM Client WHERE ClientID = $1', [clientID]);
   
   try {
@@ -130,8 +196,8 @@ exports.createReceipt = async (req, res) => {
     
     // Insert receipt
     const { rows } = await pool.query(
-      'INSERT INTO Receipt (ClientID, PaymentMethod, TotalPayout, PickupDate, PickupTime, CreatedBy) VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIMESTAMP, $4) RETURNING ReceiptID',
-      [clientID, client.rows[0].paymentmethod, totalPayout, createdBy]
+      'INSERT INTO Receipt (ClientID, PaymentMethod, TotalPayout, TotalVolume, PickupDate, PickupTime, CreatedBy) VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_TIMESTAMP, $5) RETURNING ReceiptID',
+      [clientID, client.rows[0].paymentmethod, totalPayout, totalVolume, createdBy]
     );
     const receiptID = rows[0].receiptid;
 
@@ -140,19 +206,25 @@ exports.createReceipt = async (req, res) => {
       await pool.query(`
         INSERT INTO AutoReceiptMetals (
           ReceiptID, DrumsRotorsWeight, DrumsRotorsPrice, ShortIronWeight, ShortIronPrice,
-          SteelShredWeight, SteelShredPrice, AluminumRadiatorsWeight, AluminumRadiatorsPrice,
-          BrassCopperRadiatorsWeight, BrassCopperRadiatorsPrice, AluminumWeight, AluminumPrice,
-          BatteriesWeight, BatteriesPrice
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          ShredSteelWeight, ShredSteelPrice, AluminumBreakageWeight, AluminumBreakagePrice,
+          DirtyAluminumRadiatorsWeight, DirtyAluminumRadiatorsPrice, WiringHarnessWeight, WiringHarnessPrice,
+          ACCompressorWeight, ACCompressorPrice, AlternatorStarterWeight, AlternatorStarterPrice,
+          AluminumRimsWeight, AluminumRimsPrice, ChromeRimsWeight, ChromeRimsPrice,
+          BrassCopperRadiatorWeight, BrassCopperRadiatorPrice
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
       `, [
         receiptID,
         metals.DrumsRotors.weight, metals.DrumsRotors.price,
         metals.ShortIron.weight, metals.ShortIron.price,
-        metals.SteelShred.weight, metals.SteelShred.price,
-        metals.AluminumRadiators.weight, metals.AluminumRadiators.price,
-        metals.BrassCopperRadiators.weight, metals.BrassCopperRadiators.price,
-        metals.Aluminum.weight, metals.Aluminum.price,
-        metals.Batteries.weight, metals.Batteries.price
+        metals.ShredSteel.weight, metals.ShredSteel.price,
+        metals.AluminumBreakage.weight, metals.AluminumBreakage.price,
+        metals.DirtyAluminumRadiators.weight, metals.DirtyAluminumRadiators.price,
+        metals.WiringHarness.weight, metals.WiringHarness.price,
+        metals.ACCompressor.weight, metals.ACCompressor.price,
+        metals.AlternatorStarter.weight, metals.AlternatorStarter.price,
+        metals.AluminumRims.weight, metals.AluminumRims.price,
+        metals.ChromeRims.weight, metals.ChromeRims.price,
+        metals.BrassCopperRadiator.weight, metals.BrassCopperRadiator.price
       ]);
 
       // Update AutoClientTotals
@@ -161,26 +233,79 @@ exports.createReceipt = async (req, res) => {
         SET 
           TotalDrumsRotors = TotalDrumsRotors + $1,
           TotalShortIron = TotalShortIron + $2,
-          TotalSteelShred = TotalSteelShred + $3,
-          TotalAluminumRadiators = TotalAluminumRadiators + $4,
-          TotalBrassCopperRadiators = TotalBrassCopperRadiators + $5,
-          TotalAluminum = TotalAluminum + $6,
-          TotalBatteries = TotalBatteries + $7,
-          TotalPayout = TotalPayout + $8
-        WHERE ClientID = $9
+          TotalShredSteel = TotalShredSteel + $3,
+          TotalAluminumBreakage = TotalAluminumBreakage + $4,
+          TotalDirtyAluminumRadiators = TotalDirtyAluminumRadiators + $5,
+          TotalWiringHarness = TotalWiringHarness + $6,
+          TotalACCompressor = TotalACCompressor + $7,
+          TotalAlternatorStarter = TotalAlternatorStarter + $8,
+          TotalAluminumRims = TotalAluminumRims + $9,
+          TotalChromeRims = TotalChromeRims + $10,
+          TotalBrassCopperRadiator = TotalBrassCopperRadiator + $11,
+          TotalPayout = TotalPayout + $12
+        WHERE ClientID = $13
       `, [
         metals.DrumsRotors.weight,
         metals.ShortIron.weight,
-        metals.SteelShred.weight,
-        metals.AluminumRadiators.weight,
-        metals.BrassCopperRadiators.weight,
-        metals.Aluminum.weight,
-        metals.Batteries.weight,
+        metals.ShredSteel.weight,
+        metals.AluminumBreakage.weight,
+        metals.DirtyAluminumRadiators.weight,
+        metals.WiringHarness.weight,
+        metals.ACCompressor.weight,
+        metals.AlternatorStarter.weight,
+        metals.AluminumRims.weight,
+        metals.ChromeRims.weight,
+        metals.BrassCopperRadiator.weight,
+        totalPayout,
+        clientID
+      ]);
+    } else if (client.rows[0].clienttype === 'hvac') {
+      await pool.query(`
+        INSERT INTO HVACReceiptMetals (
+          ReceiptID, ShredSteelWeight, ShredSteelPrice, DirtyAlumCopperRadiatorsWeight, DirtyAlumCopperRadiatorsPrice,
+          CleanAluminumRadiatorsWeight, CleanAluminumRadiatorsPrice, CopperTwoWeight, CopperTwoPrice,
+          CompressorsWeight, CompressorsPrice, DirtyBrassWeight, DirtyBrassPrice,
+          ElectricMotorsWeight, ElectricMotorsPrice, AluminumBreakageWeight, AluminumBreakagePrice
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      `, [
+        receiptID,
+        metals.ShredSteel.weight, metals.ShredSteel.price,
+        metals.DirtyAlumCopperRadiators.weight, metals.DirtyAlumCopperRadiators.price,
+        metals.CleanAluminumRadiators.weight, metals.CleanAluminumRadiators.price,
+        metals.CopperTwo.weight, metals.CopperTwo.price,
+        metals.Compressors.weight, metals.Compressors.price,
+        metals.DirtyBrass.weight, metals.DirtyBrass.price,
+        metals.ElectricMotors.weight, metals.ElectricMotors.price,
+        metals.AluminumBreakage.weight, metals.AluminumBreakage.price
+      ]);
+
+      // Update HVACClientTotals
+      await pool.query(`
+        UPDATE HVACClientTotals
+        SET 
+          TotalShredSteel = TotalShredSteel + $1,
+          TotalDirtyAlumCopperRadiators = TotalDirtyAlumCopperRadiators + $2,
+          TotalCleanAluminumRadiators = TotalCleanAluminumRadiators + $3,
+          TotalCopperTwo = TotalCopperTwo + $4,
+          TotalCompressors = TotalCompressors + $5,
+          TotalDirtyBrass = TotalDirtyBrass + $6,
+          TotalElectricMotors = TotalElectricMotors + $7,
+          TotalAluminumBreakage = TotalAluminumBreakage + $8,
+          TotalPayout = TotalPayout + $9
+        WHERE ClientID = $10
+      `, [
+        metals.ShredSteel.weight,
+        metals.DirtyAlumCopperRadiators.weight,
+        metals.CleanAluminumRadiators.weight,
+        metals.CopperTwo.weight,
+        metals.Compressors.weight,
+        metals.DirtyBrass.weight,
+        metals.ElectricMotors.weight,
+        metals.AluminumBreakage.weight,
         totalPayout,
         clientID
       ]);
     }
-    // Similar logic for HVAC and Insulation clients
 
     // Insert user-defined metals
     for (const metal of userDefinedMetals) {
@@ -192,34 +317,16 @@ exports.createReceipt = async (req, res) => {
       await pool.query('INSERT INTO CatalyticConverter (ReceiptID, PartNumber, Price, PercentFull) VALUES ($1, $2, $3, $4)', [receiptID, converter.partNumber, converter.price, converter.percentFull]);
     }
 
-    // Update daily totals
-    for (const [metalName, metalData] of Object.entries(metals)) {
-      await pool.query(
-        'INSERT INTO DailyMetalTotals (UserID, Date, MetalName, TotalWeight) VALUES ($1, CURRENT_DATE, $2, $3) ON CONFLICT (UserID, Date, MetalName) DO UPDATE SET TotalWeight = DailyMetalTotals.TotalWeight + $3',
-        [createdBy, metalName, metalData.weight]
-      );
-    }
-    for (const metal of userDefinedMetals) {
-      await pool.query(
-        'INSERT INTO DailyMetalTotals (UserID, Date, MetalName, TotalWeight) VALUES ($1, CURRENT_DATE, $2, $3) ON CONFLICT (UserID, Date, MetalName) DO UPDATE SET TotalWeight = DailyMetalTotals.TotalWeight + $3',
-        [createdBy, metal.name, metal.weight]
-      );
-    }
+    // Update Client's LastPickupDate
+    await pool.query('UPDATE Client SET LastPickupDate = CURRENT_DATE WHERE ClientID = $1', [clientID]);
 
     await pool.query('COMMIT');
-    res.json({ message: 'Receipt created successfully', receiptID });
+    res.status(201).json({ message: 'Receipt created successfully', receiptID });
   } catch (error) {
     await pool.query('ROLLBACK');
+    console.error('Error creating receipt:', error);
     res.status(500).json({ message: 'Error creating receipt', error: error.message });
   }
 };
 
-exports.getDailyTotals = async (req, res) => {
-  const { date } = req.query;
-  try {
-    const { rows } = await pool.query('SELECT * FROM DailyMetalTotals WHERE Date = $1', [date]);
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching daily totals' });
-  }
-};
+module.exports = exports;

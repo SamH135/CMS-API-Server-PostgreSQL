@@ -16,6 +16,8 @@ router.use(authenticateISACToken);
 
 // Protected routes
 router.get('/dashboard', asyncHandler(isacController.dashboard));
+
+// Client Rroutes
 router.get('/clientList', asyncHandler(isacController.clientList));
 router.get('/clientInfo/:clientID', asyncHandler(isacController.clientInfo));
 router.get('/pickupInfo', asyncHandler(isacController.pickupInfo));
@@ -37,7 +39,7 @@ router.get('/requests', asyncHandler(isacController.getRequests));
 router.get('/requests/:requestID', asyncHandler(isacController.getRequestById));
 router.post('/requests', asyncHandler(isacController.createRequest));
 router.put('/requests/:requestID', asyncHandler(isacController.updateRequest));
-router.delete('/deleteRequests', asyncHandler(isacController.deleteMultipleRequests));
+
 
 // Admin-only routes
 router.use(authorizeRole('admin'));
@@ -47,6 +49,8 @@ router.post('/updateClient', asyncHandler(isacController.updateClient));
 router.delete('/deleteUser/:userID', asyncHandler(isacController.deleteUser));
 router.post('/updateUser', asyncHandler(isacController.updateUser));
 router.get('/searchUsers', asyncHandler(isacController.searchUsers));
+router.post('/addClient', authenticateISACToken, authorizeRole('admin'), asyncHandler(isacController.addClient));
+router.delete('/deleteRequests', asyncHandler(isacController.deleteMultipleRequests));
 
 // Data analytic routes
 router.get('/top-clients-by-metal', asyncHandler(isacController.getTopClientsByMetal));
