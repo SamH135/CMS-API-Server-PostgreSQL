@@ -63,7 +63,7 @@ exports.createUser = async (req, res) => {
 exports.clientList = async (req, res) => {
   try {
     const clients = await getClients();
-    console.log("Sending client list:", clients); // Add this log for debugging
+    console.log("Sending client list:", clients); // log for debugging
     res.status(200).json({ clients });
   } catch (error) {
     console.error('Error retrieving clients:', error);
@@ -75,7 +75,7 @@ exports.searchClients = async (req, res) => {
   const { term } = req.query;
   try {
     const clients = await searchClientsByTerm(term);
-    console.log("Sending search results:", clients); // Add this log for debugging
+    console.log("Sending search results:", clients); // log for debugging
     res.status(200).json({ clients });
   } catch (error) {
     console.error('Error searching clients:', error);
@@ -97,7 +97,7 @@ async function searchClientsByTerm(term) {
     FROM Client
     WHERE ClientName ILIKE $1 OR ClientID::text ILIKE $1 OR ClientLocation ILIKE $1
   `, [`%${term}%`]);
-  console.log("Search results:", rows); // Add this log for debugging
+  console.log("Search results:", rows); // log for debugging
   return rows;
 }
 
@@ -106,6 +106,32 @@ async function searchClientsByTerm(term) {
 
 
 
+
+const metalLabels = {
+  'auto': {
+    'drumsrotors': "Drums & Rotors",
+    'shortiron': "Short Iron",
+    'shredsteel': "Shred Steel",
+    'aluminumbreakage': "Aluminum Breakage",
+    'dirtyaluminumradiators': "Dirty Aluminum Radiators",
+    'wiringharness': "Wiring Harness",
+    'accompressor': "A/C Compressor",
+    'alternatorstarter': "Alternator/Starter",
+    'aluminumrims': "Aluminum Rims",
+    'chromerims': "Chrome Rims",
+    'brasscopperradiator': "Brass Copper Radiator"
+  },
+  'hvac': {
+    'shredsteel': "Shred Steel",
+    'dirtyalumcopperradiators': "Dirty Alum/Copper Radiators",
+    'cleanaluminumradiators': "Clean Aluminum Radiators",
+    'coppertwo': "#2 Copper",
+    'compressors': "Compressors",
+    'dirtybrass': "Dirty Brass",
+    'electricmotors': "Electric Motors",
+    'aluminumbreakage': "Aluminum Breakage"
+  }
+};
 
 exports.getMetalPrices = async (req, res) => {
   console.log("Backend - getMetalPrices called with query:", req.query);
@@ -141,16 +167,13 @@ exports.getMetalPrices = async (req, res) => {
       return res.status(404).json({ message: 'No prices found for the given client type' });
     }
 
-    // Format the metal names and exclude the PriceID
+    const labels = metalLabels[clientType.toLowerCase()];
     const formattedPrices = {};
     Object.entries(rows[0]).forEach(([key, value]) => {
       if (key !== 'priceid' && key !== 'effectivedate') {
-        const formattedKey = key.replace(/price$/i, '')
-                                .split(/(?=[A-Z])/)
-                                .join(' ')
-                                .toLowerCase()
-                                .replace(/\b\w/g, l => l.toUpperCase());
-        formattedPrices[formattedKey] = value;
+        const baseKey = key.replace(/price$/i, '').toLowerCase();
+        const label = labels[baseKey] || baseKey; // Use the mapped label if available, otherwise use the original key
+        formattedPrices[label] = value;
       }
     });
 
@@ -161,19 +184,6 @@ exports.getMetalPrices = async (req, res) => {
     res.status(500).json({ message: 'Error fetching metal prices' });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

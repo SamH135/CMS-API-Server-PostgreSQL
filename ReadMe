@@ -49,29 +49,27 @@ NEED TO UPDATE THIS WITH FINAL FILE STRUCTURE
 
     determine any extra features to make ready for production
 
-    improve/add request view/edit/search/delete logic to control files to support request pages in the front end
-
     create AddClient controllers in isacController to add clients - also in FE
     - only for 'admin' users
+    - NEED TO TEST THIS
 
-    create setMetalPrices Interface - db needs to reflect this properly
+    create setMetalPrices Interface 
 
-    NOTES:
-        - sum(receipts weights and payout) = totals on clientInfo (ClientTotal and receiptTotal tables): this will come into effect when the server is set up with the receipt generating react client and is receiving receipt data over the network
+    Create query to look at time in between recent receipts to suggest an average pickup time
 
-        - cron task needs to check for overdue pickups based on users who have a value for the avgerage time between pickup attribute
-
-
-    store data for time in between receipts (pickups) for a given client to get an accurate estimate for that value in the client database
-    - need to updated the database to reflect this
-
-    test cron tasks or create new cron tasks on render
+    create cron tasks on render to update needsPickup
 
     need to add logic to determine when clients need pickups based on their last pickupdate and time in between
     - this has been done but needs to be tested, and it might be split off as a seperate project due to the fact that render allows cron projects as a service
 
     connect last pickup client attribute to lastest receipt date -> unless manually changed (update pickupdate)
     - add manual update pickup option in clientInfo and route pages
+
+
+NOTES:
+    - sum(receipts weights and payout) = totals on clientInfo (ClientTotal and receiptTotal tables): this will come into effect when the server is set up with the receipt generating react client and is receiving receipt data over the network
+
+    - cron task needs to check for overdue pickups based on users who have a value for the avgerage time between pickup attribute
 
 
 OPTIONAL/EXTRA:
