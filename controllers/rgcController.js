@@ -188,6 +188,8 @@ exports.getMetalPrices = async (req, res) => {
 
 
 
+// rgcController.js
+
 exports.createReceipt = async (req, res) => {
   const { 
     clientID, 
@@ -224,17 +226,17 @@ exports.createReceipt = async (req, res) => {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
       `, [
         receiptID,
-        metals.DrumsRotors.weight, metals.DrumsRotors.price,
-        metals.ShortIron.weight, metals.ShortIron.price,
-        metals.ShredSteel.weight, metals.ShredSteel.price,
-        metals.AluminumBreakage.weight, metals.AluminumBreakage.price,
-        metals.DirtyAluminumRadiators.weight, metals.DirtyAluminumRadiators.price,
-        metals.WiringHarness.weight, metals.WiringHarness.price,
-        metals.ACCompressor.weight, metals.ACCompressor.price,
-        metals.AlternatorStarter.weight, metals.AlternatorStarter.price,
-        metals.AluminumRims.weight, metals.AluminumRims.price,
-        metals.ChromeRims.weight, metals.ChromeRims.price,
-        metals.BrassCopperRadiator.weight, metals.BrassCopperRadiator.price
+        metals['Drums & Rotors'].weight, metals['Drums & Rotors'].price,
+        metals['Short Iron'].weight, metals['Short Iron'].price,
+        metals['Shred Steel'].weight, metals['Shred Steel'].price,
+        metals['Aluminum Breakage'].weight, metals['Aluminum Breakage'].price,
+        metals['Dirty Aluminum Radiators'].weight, metals['Dirty Aluminum Radiators'].price,
+        metals['Wiring Harness'].weight, metals['Wiring Harness'].price,
+        metals['A/C Compressor'].weight, metals['A/C Compressor'].price,
+        metals['Alternator/Starter'].weight, metals['Alternator/Starter'].price,
+        metals['Aluminum Rims'].weight, metals['Aluminum Rims'].price,
+        metals['Chrome Rims'].weight, metals['Chrome Rims'].price,
+        metals['Brass Copper Radiator'].weight, metals['Brass Copper Radiator'].price
       ]);
 
       // Update AutoClientTotals
@@ -255,17 +257,17 @@ exports.createReceipt = async (req, res) => {
           TotalPayout = TotalPayout + $12
         WHERE ClientID = $13
       `, [
-        metals.DrumsRotors.weight,
-        metals.ShortIron.weight,
-        metals.ShredSteel.weight,
-        metals.AluminumBreakage.weight,
-        metals.DirtyAluminumRadiators.weight,
-        metals.WiringHarness.weight,
-        metals.ACCompressor.weight,
-        metals.AlternatorStarter.weight,
-        metals.AluminumRims.weight,
-        metals.ChromeRims.weight,
-        metals.BrassCopperRadiator.weight,
+        metals['Drums & Rotors'].weight,
+        metals['Short Iron'].weight,
+        metals['Shred Steel'].weight,
+        metals['Aluminum Breakage'].weight,
+        metals['Dirty Aluminum Radiators'].weight,
+        metals['Wiring Harness'].weight,
+        metals['A/C Compressor'].weight,
+        metals['Alternator/Starter'].weight,
+        metals['Aluminum Rims'].weight,
+        metals['Chrome Rims'].weight,
+        metals['Brass Copper Radiator'].weight,
         totalPayout,
         clientID
       ]);
@@ -279,14 +281,14 @@ exports.createReceipt = async (req, res) => {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       `, [
         receiptID,
-        metals.ShredSteel.weight, metals.ShredSteel.price,
-        metals.DirtyAlumCopperRadiators.weight, metals.DirtyAlumCopperRadiators.price,
-        metals.CleanAluminumRadiators.weight, metals.CleanAluminumRadiators.price,
-        metals.CopperTwo.weight, metals.CopperTwo.price,
-        metals.Compressors.weight, metals.Compressors.price,
-        metals.DirtyBrass.weight, metals.DirtyBrass.price,
-        metals.ElectricMotors.weight, metals.ElectricMotors.price,
-        metals.AluminumBreakage.weight, metals.AluminumBreakage.price
+        metals['Shred Steel'].weight, metals['Shred Steel'].price,
+        metals['Dirty Alum/Copper Radiators'].weight, metals['Dirty Alum/Copper Radiators'].price,
+        metals['Clean Aluminum Radiators'].weight, metals['Clean Aluminum Radiators'].price,
+        metals['#2 Copper'].weight, metals['#2 Copper'].price,
+        metals['Compressors'].weight, metals['Compressors'].price,
+        metals['Dirty Brass'].weight, metals['Dirty Brass'].price,
+        metals['Electric Motors'].weight, metals['Electric Motors'].price,
+        metals['Aluminum Breakage'].weight, metals['Aluminum Breakage'].price
       ]);
 
       // Update HVACClientTotals
@@ -304,14 +306,14 @@ exports.createReceipt = async (req, res) => {
           TotalPayout = TotalPayout + $9
         WHERE ClientID = $10
       `, [
-        metals.ShredSteel.weight,
-        metals.DirtyAlumCopperRadiators.weight,
-        metals.CleanAluminumRadiators.weight,
-        metals.CopperTwo.weight,
-        metals.Compressors.weight,
-        metals.DirtyBrass.weight,
-        metals.ElectricMotors.weight,
-        metals.AluminumBreakage.weight,
+        metals['Shred Steel'].weight,
+        metals['Dirty Alum/Copper Radiators'].weight,
+        metals['Clean Aluminum Radiators'].weight,
+        metals['#2 Copper'].weight,
+        metals['Compressors'].weight,
+        metals['Dirty Brass'].weight,
+        metals['Electric Motors'].weight,
+        metals['Aluminum Breakage'].weight,
         totalPayout,
         clientID
       ]);
@@ -331,7 +333,7 @@ exports.createReceipt = async (req, res) => {
     await pool.query('UPDATE Client SET LastPickupDate = CURRENT_DATE WHERE ClientID = $1', [clientID]);
 
     await pool.query('COMMIT');
-    res.status(201).json({ message: 'Receipt created successfully', receiptID });
+    res.json({ message: 'Receipt created successfully', receiptID });
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('Error creating receipt:', error);
