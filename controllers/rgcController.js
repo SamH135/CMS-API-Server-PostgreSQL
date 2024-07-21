@@ -86,8 +86,7 @@ exports.searchClients = async (req, res) => {
 
 // Helper functions
 async function getClients() {
-  const { rows } = await pool.query('SELECT ClientID, ClientName, ClientLocation, ClientType FROM Client');
-  console.log("Fetched clients:", rows); // Add this log for debugging
+  const { rows } = await pool.query('SELECT ClientID, ClientName, ClientLocation, ClientType FROM Client WHERE ClientType != \'insulation\'');
   return rows;
 }
 
@@ -95,7 +94,8 @@ async function searchClientsByTerm(term) {
   const { rows } = await pool.query(`
     SELECT ClientID, ClientName, ClientLocation, ClientType
     FROM Client
-    WHERE ClientName ILIKE $1 OR ClientID::text ILIKE $1 OR ClientLocation ILIKE $1
+    WHERE (ClientName ILIKE $1 OR ClientID::text ILIKE $1 OR ClientLocation ILIKE $1)
+    AND ClientType != 'insulation'
   `, [`%${term}%`]);
   console.log("Search results:", rows); // log for debugging
   return rows;
