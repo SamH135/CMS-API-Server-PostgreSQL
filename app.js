@@ -22,7 +22,7 @@ pool.query('SELECT 1')
   });
 
 app.use(cors({
-  origin: [process.env.RG_CLIENT_URL, process.env.ISA_CLIENT_URL, 'http://localhost:3000'], // DELETE localhost after testing
+  origin: [process.env.RG_CLIENT_URL, process.env.ISA_CLIENT_URL, 'http://localhost:3000', 'http://localhost:3001'], // DELETE localhost after testing
   credentials: true,
 }));
 

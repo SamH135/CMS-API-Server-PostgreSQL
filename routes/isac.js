@@ -50,13 +50,21 @@ router.delete('/deleteUser/:userID', asyncHandler(isacController.deleteUser));
 router.post('/updateUser', asyncHandler(isacController.updateUser));
 router.get('/searchUsers', asyncHandler(isacController.searchUsers));
 router.post('/addClient', authenticateISACToken, authorizeRole('admin'), asyncHandler(isacController.addClient));
+
 router.delete('/deleteRequests', asyncHandler(isacController.deleteMultipleRequests));
 
-// Data analytic routes
+router.get('/hvac-prices', asyncHandler(isacController.getHVACPrices));
+router.post('/hvac-prices', asyncHandler(isacController.setHVACPrices));
+router.get('/auto-prices', asyncHandler(isacController.getAutoPrices));
+router.post('/auto-prices', asyncHandler(isacController.setAutoPrices));
+router.post('/update-shred-steel-price', asyncHandler(isacController.updateShredSteelPrice));
+
+
+// Data analytic routes - these are currently not being used
 router.get('/top-clients-by-metal', asyncHandler(isacController.getTopClientsByMetal));
 router.get('/top-clients-by-volume', asyncHandler(isacController.getTopClientsByVolume));
 
-// Last pickup date update routes
+// Last pickup date update routes - (needs to be implemented)
 router.put('/update-last-pickup/:clientID', asyncHandler(isacController.updateLastPickupDate));
 router.put('/manual-update-pickup/:clientID', asyncHandler(isacController.manualUpdatePickupDate));
 

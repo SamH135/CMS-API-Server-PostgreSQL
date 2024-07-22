@@ -137,7 +137,6 @@ exports.getMetalPrices = async (req, res) => {
   console.log("Backend - getMetalPrices called with query:", req.query);
   const { clientType } = req.query;
   try {
-    let query;
     let table;
     switch (clientType.toLowerCase()) {
       case 'auto':
@@ -151,12 +150,7 @@ exports.getMetalPrices = async (req, res) => {
         return res.status(400).json({ message: 'Invalid client type' });
     }
 
-    query = `
-      SELECT * FROM ${table}
-      WHERE EffectiveDate <= CURRENT_DATE
-      ORDER BY EffectiveDate DESC
-      LIMIT 1
-    `;
+    const query = `SELECT * FROM ${table} LIMIT 1`;
 
     console.log("Backend - Executing query:", query);
     const { rows } = await pool.query(query);
@@ -170,11 +164,9 @@ exports.getMetalPrices = async (req, res) => {
     const labels = metalLabels[clientType.toLowerCase()];
     const formattedPrices = {};
     Object.entries(rows[0]).forEach(([key, value]) => {
-      if (key !== 'priceid' && key !== 'effectivedate') {
-        const baseKey = key.replace(/price$/i, '').toLowerCase();
-        const label = labels[baseKey] || baseKey; // Use the mapped label if available, otherwise use the original key
-        formattedPrices[label] = value;
-      }
+      const baseKey = key.replace(/price$/i, '').toLowerCase();
+      const label = labels[baseKey] || baseKey;
+      formattedPrices[label] = value;
     });
 
     console.log("Backend - Sending formatted response:", formattedPrices);

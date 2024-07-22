@@ -153,13 +153,16 @@ exports.updateClient = async (req, res) => {
 
 exports.pickupInfo = async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT ClientID as clientid, ClientName as clientname, ClientLocation as clientlocation, 
-             LastPickupDate as lastpickupdate, NeedsPickup as needspickup
-      FROM Client
-      ORDER BY LastPickupDate DESC
-    `);
-    res.status(200).json({ clients: rows });
+    const query = `
+      SELECT r.ReceiptID, r.ClientID, c.ClientName, c.ClientLocation, 
+             r.PickupDate, r.PickupTime, c.NeedsPickup
+      FROM Receipt r
+      JOIN Client c ON r.ClientID = c.ClientID
+      ORDER BY r.PickupDate DESC, r.PickupTime DESC
+    `;
+
+    const { rows } = await pool.query(query);
+    res.status(200).json({ receipts: rows });
   } catch (error) {
     console.error('Error retrieving pickup information:', error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -169,8 +172,11 @@ exports.pickupInfo = async (req, res) => {
 exports.searchClients = async (req, res) => {
   const searchTerm = req.query.term;
   try {
-    const clients = await searchClientsByTerm(searchTerm);
-    res.status(200).json({ clients });
+    const { rows } = await pool.query(`
+      SELECT * FROM Client
+      WHERE ClientName ILIKE $1 OR ClientID::text ILIKE $1 OR ClientLocation ILIKE $1
+    `, [`%${searchTerm}%`]);
+    res.status(200).json({ clients: rows });
   } catch (error) {
     console.error('Error searching clients:', error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -220,19 +226,21 @@ exports.addClient = async (req, res) => {
     paymentmethod
   } = req.body;
 
+  const client = await pool.connect();
+
   try {
     // Start a transaction
-    await pool.query('BEGIN');
+    await client.query('BEGIN');
 
     // Insert new client
     const clientQuery = `
       INSERT INTO Client (
         ClientName, ClientLocation, ClientType, AvgTimeBetweenPickups,
-        LocationNotes, LocationContact, PaymentMethod
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        LocationNotes, LocationContact, PaymentMethod, RegistrationDate, NeedsPickup
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, false)
       RETURNING ClientID
     `;
-    const { rows } = await pool.query(clientQuery, [
+    const { rows } = await client.query(clientQuery, [
       clientname, clientlocation, clienttype, avgtimebetweenpickups,
       locationnotes, locationcontact, paymentmethod
     ]);
@@ -250,18 +258,21 @@ exports.addClient = async (req, res) => {
     }
     
     if (totalsQuery) {
-      await pool.query(totalsQuery, [clientID]);
+      await client.query(totalsQuery, [clientID]);
     }
 
     // Commit the transaction
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
 
     res.status(201).json({ success: true, message: 'Client added successfully', clientID });
   } catch (error) {
     // Rollback in case of error
-    await pool.query('ROLLBACK');
+    await client.query('ROLLBACK');
     console.error('Error adding client:', error);
     res.status(500).json({ success: false, message: 'An error occurred while adding the client' });
+  } finally {
+    // Release the client back to the pool
+    client.release();
   }
 };
 
@@ -568,24 +579,86 @@ async function getUsers() {
  *       Functions for price set/get operations          *
  *******************************************************/
 
-
-  async function getHVACPrices() {
-    const query = `
-      SELECT * FROM SetHVACPrices
-      WHERE EffectiveDate <= CURRENT_DATE
-      ORDER BY EffectiveDate DESC
-      LIMIT 1
-    `;
-    const { rows } = await pool.query(query);
-    return rows[0] || null;
-  }
-  
   exports.getHVACPrices = async (req, res) => {
     try {
-      const prices = await getHVACPrices();
-      res.status(200).json({ prices });
+      const query = 'SELECT * FROM SetHVACPrices';
+      const { rows } = await pool.query(query);
+      res.status(200).json(rows[0] || {});
     } catch (error) {
       console.error('Error retrieving HVAC prices:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };
+  
+  exports.setHVACPrices = async (req, res) => {
+    try {
+      const prices = req.body;
+      const query = `
+        UPDATE SetHVACPrices SET
+        ShredSteelPrice = $1, DirtyAlumCopperRadiatorsPrice = $2,
+        CleanAluminumRadiatorsPrice = $3, CopperTwoPrice = $4, 
+        CompressorsPrice = $5, DirtyBrassPrice = $6, 
+        ElectricMotorsPrice = $7, AluminumBreakagePrice = $8
+      `;
+      await pool.query(query, [
+        prices.shredsteelprice, prices.dirtyalumcopperradiatorsprice,
+        prices.cleanaluminumradiatorsprice, prices.coppertwoprice,
+        prices.compressorsprice, prices.dirtybrassprice,
+        prices.electricmotorsprice, prices.aluminumbreakageprice
+      ]);
+  
+      // Update Auto prices table with new shred steel price
+      await pool.query(`
+        UPDATE SetAutoPrices
+        SET ShredSteelPrice = $1
+      `, [prices.shredsteelprice]);
+  
+      res.status(200).json({ message: 'HVAC prices updated successfully. Shred steel price also updated in Auto prices.' });
+    } catch (error) {
+      console.error('Error setting HVAC prices:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };
+  
+  exports.getAutoPrices = async (req, res) => {
+    try {
+      const query = 'SELECT * FROM SetAutoPrices';
+      const { rows } = await pool.query(query);
+      res.status(200).json(rows[0] || {});
+    } catch (error) {
+      console.error('Error retrieving Auto prices:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };
+  
+  exports.setAutoPrices = async (req, res) => {
+    try {
+      const prices = req.body;
+      const query = `
+        UPDATE SetAutoPrices SET
+        DrumsRotorsPrice = $1, ShortIronPrice = $2, ShredSteelPrice = $3,
+        AluminumBreakagePrice = $4, DirtyAluminumRadiatorsPrice = $5, 
+        WiringHarnessPrice = $6, ACCompressorPrice = $7, 
+        AlternatorStarterPrice = $8, AluminumRimsPrice = $9,
+        ChromeRimsPrice = $10, BrassCopperRadiatorPrice = $11
+      `;
+      await pool.query(query, [
+        prices.drumsrotorsprice, prices.shortironprice, prices.shredsteelprice,
+        prices.aluminumbreakageprice, prices.dirtyaluminumradiatorsprice,
+        prices.wiringharnessprice, prices.accompressorprice,
+        prices.alternatorstarterprice, prices.aluminumrimsprice,
+        prices.chromerimsprice, prices.brasscopperradiatorprice
+      ]);
+  
+      // Update HVAC prices table with new shred steel price
+      await pool.query(`
+        UPDATE SetHVACPrices
+        SET ShredSteelPrice = $1
+      `, [prices.shredsteelprice]);
+  
+      res.status(200).json({ message: 'Auto prices updated successfully. Shred steel price also updated in HVAC prices.' });
+    } catch (error) {
+      console.error('Error setting Auto prices:', error);
       res.status(500).json({ message: 'Internal Server Error' });
     }
   };
