@@ -155,7 +155,7 @@ exports.pickupInfo = async (req, res) => {
   try {
     const query = `
       SELECT r.ReceiptID, r.ClientID, c.ClientName, c.ClientLocation, 
-             r.PickupDate, r.PickupTime, c.NeedsPickup
+             r.PickupDate, r.PickupTime, c.NeedsPickup, r.CreatedBy
       FROM Receipt r
       JOIN Client c ON r.ClientID = c.ClientID
       ORDER BY r.PickupDate DESC, r.PickupTime DESC
