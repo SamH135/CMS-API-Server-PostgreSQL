@@ -226,6 +226,13 @@ exports.addClient = async (req, res) => {
     paymentmethod
   } = req.body;
 
+
+  // Validate payment method
+  const validPaymentMethods = ['Cash', 'Check', 'Direct Deposit'];
+  if (!validPaymentMethods.includes(paymentmethod)) {
+    return res.status(400).json({ success: false, message: 'Invalid payment method' });
+  }
+
   const client = await pool.connect();
 
   try {

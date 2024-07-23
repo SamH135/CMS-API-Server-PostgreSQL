@@ -17,7 +17,7 @@ CREATE TABLE Client (
   LocationContact VARCHAR(100),
   TotalPayout DECIMAL(10, 2) CHECK (TotalPayout >= 0),
   TotalVolume DECIMAL(10, 2) CHECK (TotalVolume >= 0),
-  PaymentMethod VARCHAR(20),
+  PaymentMethod VARCHAR(20) CHECK (PaymentMethod IN ('Cash', 'Check', 'Direct Deposit')),
   LastPickupDate DATE,
   NeedsPickup BOOLEAN NOT NULL,
   CONSTRAINT check_client_type CHECK (ClientType IN ('auto', 'hvac', 'insulation', 'other'))
@@ -175,22 +175,18 @@ CREATE INDEX ON AutoReceiptMetals (ReceiptID);
 -- Create SetAutoPrices table - stores predefined prices for auto metals that admins can set
 -- Prices will be sent to the RGC to create receipts
 CREATE TABLE SetAutoPrices (
-  PriceID SERIAL PRIMARY KEY,
-  EffectiveDate DATE NOT NULL,
-  DrumsRotorsPrice DECIMAL(10, 2) NOT NULL,
-  ShortIronPrice DECIMAL(10, 2) NOT NULL,
-  ShredSteelPrice DECIMAL(10, 2) NOT NULL,
-  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL,
-  DirtyAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL,
-  WiringHarnessPrice DECIMAL(10, 2) NOT NULL,
-  ACCompressorPrice DECIMAL(10, 2) NOT NULL,
-  AlternatorStarterPrice DECIMAL(10, 2) NOT NULL,
-  AluminumRimsPrice DECIMAL(10, 2) NOT NULL,
-  ChromeRimsPrice DECIMAL(10, 2) NOT NULL,
-  BrassCopperRadiatorPrice DECIMAL(10, 2) NOT NULL
+  DrumsRotorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ShortIronPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ShredSteelPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  DirtyAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  WiringHarnessPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ACCompressorPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  AlternatorStarterPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  AluminumRimsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ChromeRimsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  BrassCopperRadiatorPrice DECIMAL(10, 2) NOT NULL DEFAULT 0
 );
-
-CREATE INDEX ON SetAutoPrices (EffectiveDate);
 
 -- Create CatalyticConverter table - tracks detailed catalytic converter info 
 CREATE TABLE CatalyticConverter (
@@ -255,19 +251,15 @@ CREATE INDEX ON HVACReceiptMetals (ReceiptID);
 -- Create SetHVACPrices table - stores predefined prices for hvac metals that admins can set
 -- Prices will be sent to the RGC to create receipts
 CREATE TABLE SetHVACPrices (
-  PriceID SERIAL PRIMARY KEY,
-  EffectiveDate DATE NOT NULL,
-  ShredSteelPrice DECIMAL(10, 2) NOT NULL,
-  DirtyAlumCopperRadiatorsPrice DECIMAL(10, 2) NOT NULL,
-  CleanAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL,
-  CopperTwoPrice DECIMAL(10, 2) NOT NULL,
-  CompressorsPrice DECIMAL(10, 2) NOT NULL,
-  DirtyBrassPrice DECIMAL(10, 2) NOT NULL,
-  ElectricMotorsPrice DECIMAL(10, 2) NOT NULL,
-  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL
+  ShredSteelPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  DirtyAlumCopperRadiatorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  CleanAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  CopperTwoPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  CompressorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  DirtyBrassPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ElectricMotorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL DEFAULT 0
 );
-
-CREATE INDEX ON SetHVACPrices (EffectiveDate);
 
 
 
