@@ -40,6 +40,9 @@ router.get('/requests/:requestID', asyncHandler(isacController.getRequestById));
 router.post('/requests', asyncHandler(isacController.createRequest));
 router.put('/requests/:requestID', asyncHandler(isacController.updateRequest));
 
+// route info - pickup info routes
+router.get('/searchPickups', asyncHandler(isacController.searchPickups));
+
 
 // Admin-only routes
 router.use(authorizeRole('admin'));
@@ -58,7 +61,7 @@ router.post('/hvac-prices', asyncHandler(isacController.setHVACPrices));
 router.get('/auto-prices', asyncHandler(isacController.getAutoPrices));
 router.post('/auto-prices', asyncHandler(isacController.setAutoPrices));
 router.post('/update-shred-steel-price', asyncHandler(isacController.updateShredSteelPrice));
-
+router.post('/adjustInsulationFee', asyncHandler(isacController.adjustInsulationFee));
 
 // Data analytic routes - these are currently not being used
 router.get('/top-clients-by-metal', asyncHandler(isacController.getTopClientsByMetal));

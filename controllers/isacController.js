@@ -448,6 +448,45 @@ async function searchClientsByTerm(term) {
 }
 
 
+// allows admins to edit the haul/dump fees 
+// associated with insulation clients
+exports.adjustInsulationFee = async (req, res) => {
+  const { clientID, feeType, amount, isAddition } = req.body;
+
+  try {
+    let query;
+    const columnName = feeType === 'dumpfee' ? 'TotalDumpFees' : 'TotalHaulFees';
+
+    if (isAddition) {
+      query = `
+        UPDATE InsulationClientTotals
+        SET ${columnName} = ${columnName} + $1
+        WHERE ClientID = $2
+        RETURNING ${columnName} as updatedFee
+      `;
+    } else {
+      query = `
+        UPDATE InsulationClientTotals
+        SET ${columnName} = $1
+        WHERE ClientID = $2
+        RETURNING ${columnName} as updatedFee
+      `;
+    }
+
+    const { rows } = await pool.query(query, [amount, clientID]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+
+    res.status(200).json({ success: true, [feeType]: rows[0].updatedFee });
+  } catch (error) {
+    console.error('Error adjusting insulation fee:', error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+
 
 
 /*******************************************************
@@ -913,6 +952,48 @@ async function getUsers() {
       }
     } catch (error) {
       console.error('Error fetching receipt:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };
+
+  exports.searchPickups = async (req, res) => {
+    try {
+      const { term, date } = req.query;
+      let query;
+      let queryParams;
+  
+      if (term) {
+        // Search by client name or location
+        query = `
+          WITH RankedReceipts AS (
+            SELECT r.*, c.ClientName, c.ClientLocation, c.NeedsPickup,
+                   ROW_NUMBER() OVER (PARTITION BY r.ClientID ORDER BY r.PickupDate DESC, r.PickupTime DESC) as rn
+            FROM Receipt r
+            JOIN Client c ON r.ClientID = c.ClientID
+            WHERE c.ClientName ILIKE $1 OR c.ClientLocation ILIKE $1
+          )
+          SELECT * FROM RankedReceipts WHERE rn = 1
+          ORDER BY PickupDate DESC, PickupTime DESC
+        `;
+        queryParams = [`%${term}%`];
+      } else if (date) {
+        // Search by date
+        query = `
+          SELECT r.*, c.ClientName, c.ClientLocation, c.NeedsPickup
+          FROM Receipt r
+          JOIN Client c ON r.ClientID = c.ClientID
+          WHERE r.PickupDate::date = $1
+          ORDER BY r.PickupTime DESC
+        `;
+        queryParams = [date];
+      } else {
+        throw new Error('Either term or date must be provided');
+      }
+  
+      const { rows } = await pool.query(query, queryParams);
+      res.status(200).json({ receipts: rows });
+    } catch (error) {
+      console.error('Error searching pickups:', error);
       res.status(500).json({ message: 'Internal Server Error' });
     }
   };

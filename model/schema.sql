@@ -1,6 +1,13 @@
--- Create Client table
+-- Create separate sequences for each client type
+CREATE SEQUENCE hvac_seq START 1;
+CREATE SEQUENCE auto_seq START 1;
+CREATE SEQUENCE insulation_seq START 1;
+CREATE SEQUENCE other_seq START 1;
+
+
+
 CREATE TABLE Client (
-  ClientID SERIAL PRIMARY KEY,
+  ClientID VARCHAR(20) PRIMARY KEY, -- Changed to VARCHAR to accommodate the new format
   ClientName VARCHAR(100) NOT NULL,
   ClientLocation VARCHAR(200) NOT NULL,
   ClientType VARCHAR(50) NOT NULL,
@@ -10,17 +17,51 @@ CREATE TABLE Client (
   LocationContact VARCHAR(100),
   TotalPayout DECIMAL(10, 2) CHECK (TotalPayout >= 0),
   TotalVolume DECIMAL(10, 2) CHECK (TotalVolume >= 0),
-  PaymentMethod VARCHAR(20),
+  PaymentMethod VARCHAR(20) CHECK (PaymentMethod IN ('Cash', 'Check', 'Direct Deposit')),
   LastPickupDate DATE,
   NeedsPickup BOOLEAN NOT NULL,
   CONSTRAINT check_client_type CHECK (ClientType IN ('auto', 'hvac', 'insulation', 'other'))
 );
 
+-- Create indexes for improved query performance
 CREATE INDEX ON Client (ClientName);
 CREATE INDEX ON Client (ClientLocation);
 CREATE INDEX ON Client (ClientType);
 CREATE INDEX ON Client (LastPickupDate);
 CREATE INDEX ON Client (NeedsPickup);
+
+-- Function to generate ClientID
+CREATE OR REPLACE FUNCTION generate_client_id()
+RETURNS TRIGGER AS $$
+DECLARE
+    prefix CHAR(1);
+    seq_val INT;
+BEGIN
+    CASE NEW.ClientType
+        WHEN 'hvac' THEN
+            prefix := 'H';
+            SELECT nextval('hvac_seq') INTO seq_val;
+        WHEN 'auto' THEN
+            prefix := 'A';
+            SELECT nextval('auto_seq') INTO seq_val;
+        WHEN 'insulation' THEN
+            prefix := 'I';
+            SELECT nextval('insulation_seq') INTO seq_val;
+        ELSE
+            prefix := 'O';
+            SELECT nextval('other_seq') INTO seq_val;
+    END CASE;
+
+    NEW.ClientID := prefix || seq_val::text;
+    RETURN NEW;
+end;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to automatically generate ClientID
+CREATE TRIGGER set_client_id
+BEFORE INSERT ON Client
+FOR EACH ROW
+EXECUTE FUNCTION generate_client_id();
 
 -- Create User table - for system users - allows for role-based access control (RBAC)
 CREATE TABLE "User" (
@@ -34,8 +75,8 @@ CREATE TABLE "User" (
 -- Create Receipt table - receipts created by employees using the RGC react app
 CREATE TABLE Receipt (
   ReceiptID SERIAL PRIMARY KEY,
-  ClientID VARCHAR(10) NOT NULL,
-  PaymentMethod VARCHAR(20), -- needs to be set based on cliend payment method when created
+  ClientID VARCHAR(20) NOT NULL, 
+  PaymentMethod VARCHAR(20), -- Set based on client payment method when created
   TotalVolume DECIMAL(10, 2) CHECK (TotalVolume >= 0),
   TotalPayout DECIMAL(10, 2) CHECK (TotalPayout >= 0),
   PickupDate DATE NOT NULL,
@@ -63,7 +104,7 @@ CREATE INDEX ON UserDefinedMetal (ReceiptID);
 -- Create Request table - allows business clients to request pickups
 CREATE TABLE Request (
   RequestID SERIAL PRIMARY KEY,
-  ClientID VARCHAR(10) NOT NULL,
+  ClientID VARCHAR(20) NOT NULL, 
   RequestDate DATE NOT NULL,
   RequestTime TIMESTAMP NOT NULL,
   NumFullBarrels INT CHECK (NumFullBarrels >= 0),
@@ -77,12 +118,12 @@ CREATE INDEX ON Request (RequestDate);
 
 
 
--- AUTOMOTIVE
 
+-- AUTOMOTIVE
 
 -- Create AutoClientTotals table - tracks running totals for each client (automotive)
 CREATE TABLE AutoClientTotals (
-  ClientID VARCHAR(10) PRIMARY KEY,
+  ClientID VARCHAR(20) PRIMARY KEY, 
   TotalDrumsRotors DECIMAL(10, 2) DEFAULT 0,
   TotalShortIron DECIMAL(10, 2) DEFAULT 0,
   TotalShredSteel DECIMAL(10, 2) DEFAULT 0,
@@ -100,7 +141,6 @@ CREATE TABLE AutoClientTotals (
 
 CREATE INDEX ON AutoClientTotals (ClientID);
 CREATE INDEX ON AutoClientTotals (TotalPayout);
-
 
 -- Create AutoReceiptMetals table - all the usual metals that appear on receipts (auto)
 CREATE TABLE AutoReceiptMetals (
@@ -132,29 +172,23 @@ CREATE TABLE AutoReceiptMetals (
 
 CREATE INDEX ON AutoReceiptMetals (ReceiptID);
 
-
 -- Create SetAutoPrices table - stores predefined prices for auto metals that admins can set
--- prices will be sent to the RGC to create receipts
+-- Prices will be sent to the RGC to create receipts
 CREATE TABLE SetAutoPrices (
-  PriceID SERIAL PRIMARY KEY,
-  EffectiveDate DATE NOT NULL,
-  DrumsRotorsPrice DECIMAL(10, 2) NOT NULL,
-  ShortIronPrice DECIMAL(10, 2) NOT NULL,
-  ShredSteelPrice DECIMAL(10, 2) NOT NULL,
-  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL,
-  DirtyAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL,
-  WiringHarnessPrice DECIMAL(10, 2) NOT NULL,
-  ACCompressorPrice DECIMAL(10, 2) NOT NULL,
-  AlternatorStarterPrice DECIMAL(10, 2) NOT NULL,
-  AluminumRimsPrice DECIMAL(10, 2) NOT NULL,
-  ChromeRimsPrice DECIMAL(10, 2) NOT NULL,
-  BrassCopperRadiatorPrice DECIMAL(10, 2) NOT NULL
+  DrumsRotorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ShortIronPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ShredSteelPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  DirtyAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  WiringHarnessPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ACCompressorPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  AlternatorStarterPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  AluminumRimsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ChromeRimsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  BrassCopperRadiatorPrice DECIMAL(10, 2) NOT NULL DEFAULT 0
 );
 
-CREATE INDEX ON SetAutoPrices (EffectiveDate);
-
-
--- Create CatalyticConverter table - tracks detailed catalytic info 
+-- Create CatalyticConverter table - tracks detailed catalytic converter info 
 CREATE TABLE CatalyticConverter (
   ConverterID SERIAL PRIMARY KEY,
   ReceiptID INT NOT NULL,
@@ -170,13 +204,11 @@ CREATE INDEX ON CatalyticConverter (PartNumber);
 
 
 
-
 -- HVAC
 
-
--- Create HVACClientTotals table - tracks running totals each client (hvac)
+-- Create HVACClientTotals table - tracks running totals for each client (hvac)
 CREATE TABLE HVACClientTotals (
-  ClientID VARCHAR(10) PRIMARY KEY,
+  ClientID VARCHAR(20) PRIMARY KEY, 
   TotalShredSteel DECIMAL(10, 2) DEFAULT 0,
   TotalDirtyAlumCopperRadiators DECIMAL(10, 2) DEFAULT 0,
   TotalCleanAluminumRadiators DECIMAL(10, 2) DEFAULT 0,
@@ -191,8 +223,6 @@ CREATE TABLE HVACClientTotals (
 
 CREATE INDEX ON HVACClientTotals (ClientID);
 CREATE INDEX ON HVACClientTotals (TotalPayout);
-
-
 
 -- Create HVACReceiptMetals table - all the usual metals that appear on receipts (hvac)
 CREATE TABLE HVACReceiptMetals (
@@ -218,31 +248,27 @@ CREATE TABLE HVACReceiptMetals (
 
 CREATE INDEX ON HVACReceiptMetals (ReceiptID);
 
-
 -- Create SetHVACPrices table - stores predefined prices for hvac metals that admins can set
--- prices will be sent to the RGC to create receipts
+-- Prices will be sent to the RGC to create receipts
 CREATE TABLE SetHVACPrices (
-  PriceID SERIAL PRIMARY KEY,
-  EffectiveDate DATE NOT NULL,
-  ShredSteelPrice DECIMAL(10, 2) NOT NULL,
-  DirtyAlumCopperRadiatorsPrice DECIMAL(10, 2) NOT NULL,
-  CleanAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL,
-  CopperTwoPrice DECIMAL(10, 2) NOT NULL,
-  CompressorsPrice DECIMAL(10, 2) NOT NULL,
-  DirtyBrassPrice DECIMAL(10, 2) NOT NULL,
-  ElectricMotorsPrice DECIMAL(10, 2) NOT NULL,
-  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL
+  ShredSteelPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  DirtyAlumCopperRadiatorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  CleanAluminumRadiatorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  CopperTwoPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  CompressorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  DirtyBrassPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ElectricMotorsPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  AluminumBreakagePrice DECIMAL(10, 2) NOT NULL DEFAULT 0
 );
 
-CREATE INDEX ON SetHVACPrices (EffectiveDate);
+
 
 
 -- INSULATION
 
-
--- Modified InsulationClientTotals table
+-- Create InsulationClientTotals table - tracks running totals for each client (insulation)
 CREATE TABLE InsulationClientTotals (
-  ClientID VARCHAR(10) PRIMARY KEY,
+  ClientID VARCHAR(20) PRIMARY KEY, 
   TotalDumpFees DECIMAL(10, 2) DEFAULT 0,
   TotalHaulFees DECIMAL(10, 2) DEFAULT 0,
   FOREIGN KEY (ClientID) REFERENCES Client(ClientID)
@@ -250,7 +276,7 @@ CREATE TABLE InsulationClientTotals (
 
 CREATE INDEX ON InsulationClientTotals (ClientID);
 
--- Modified InsulationReceiptMetals table
+-- Create InsulationReceiptMetals table - fees that appear on receipts (insulation)
 CREATE TABLE InsulationReceiptMetals (
   ReceiptID INT PRIMARY KEY,
   DumpFee DECIMAL(10, 2) DEFAULT 0,
@@ -259,5 +285,3 @@ CREATE TABLE InsulationReceiptMetals (
 );
 
 CREATE INDEX ON InsulationReceiptMetals (ReceiptID);
-
-
