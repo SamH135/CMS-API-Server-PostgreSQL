@@ -747,6 +747,51 @@ async function getUsers() {
     }
   };
 
+  exports.getViewPrices = async (req, res) => {
+    try {
+      const hvacQuery = `
+        SELECT 
+          ShredSteelPrice as "Shred Steel",
+          DirtyAlumCopperRadiatorsPrice as "Dirty Alum/Copper Radiators",
+          CleanAluminumRadiatorsPrice as "Clean Aluminum Radiators",
+          CopperTwoPrice as "#2 Copper",
+          CompressorsPrice as "Compressors",
+          DirtyBrassPrice as "Dirty Brass",
+          ElectricMotorsPrice as "Electric Motors",
+          AluminumBreakagePrice as "Aluminum Breakage"
+        FROM SetHVACPrices
+      `;
+  
+      const autoQuery = `
+        SELECT 
+          DrumsRotorsPrice as "Drums & Rotors",
+          ShortIronPrice as "Short Iron",
+          ShredSteelPrice as "Shred Steel",
+          AluminumBreakagePrice as "Aluminum Breakage",
+          DirtyAluminumRadiatorsPrice as "Dirty Aluminum Radiators",
+          WiringHarnessPrice as "Wiring Harness",
+          ACCompressorPrice as "A/C Compressor",
+          AlternatorStarterPrice as "Alternator/Starter",
+          AluminumRimsPrice as "Aluminum Rims",
+          ChromeRimsPrice as "Chrome Rims",
+          BrassCopperRadiatorPrice as "Brass Copper Radiator"
+        FROM SetAutoPrices
+      `;
+  
+      const [hvacPrices, autoPrices] = await Promise.all([
+        pool.query(hvacQuery),
+        pool.query(autoQuery)
+      ]);
+  
+      res.status(200).json({
+        hvacPrices: hvacPrices.rows[0],
+        autoPrices: autoPrices.rows[0]
+      });
+    } catch (error) {
+      console.error('Error retrieving prices:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  };
 
 
 
@@ -1219,6 +1264,133 @@ async function getUsers() {
    *                                                     *
    *    Functions for data analysis and reporting        *
    *******************************************************/
+
+exports.getTruckLoads = async (req, res) => {
+  const { date } = req.query;
+  try {
+      const truckLoads = await fetchTruckLoadsForDate(date);
+      res.status(200).json({ truckLoads });
+  } catch (error) {
+      console.error('Error fetching truck loads:', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+// Helper function to fetch truck loads
+async function fetchTruckLoadsForDate(date) {
+  const query = `
+      WITH CombinedMetals AS (
+          SELECT 
+              r.CreatedBy,
+              'DrumsRotors' as MetalName, 
+              arm.DrumsRotorsWeight as Weight 
+          FROM Receipt r
+          JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
+          WHERE r.PickupDate::date = $1
+          
+          UNION ALL
+          
+          SELECT 
+              r.CreatedBy,
+              'ShortIron' as MetalName, 
+              arm.ShortIronWeight as Weight 
+          FROM Receipt r
+          JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
+          WHERE r.PickupDate::date = $1
+          
+          UNION ALL
+          
+          SELECT 
+              r.CreatedBy,
+              'ShredSteel' as MetalName, 
+              arm.ShredSteelWeight as Weight 
+          FROM Receipt r
+          JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
+          WHERE r.PickupDate::date = $1
+          
+          -- Add other metals from AutoReceiptMetals here
+          
+          UNION ALL
+          
+          SELECT 
+              r.CreatedBy,
+              'ShredSteel' as MetalName, 
+              hrm.ShredSteelWeight as Weight 
+          FROM Receipt r
+          JOIN HVACReceiptMetals hrm ON r.ReceiptID = hrm.ReceiptID
+          WHERE r.PickupDate::date = $1
+          
+          UNION ALL
+          
+          SELECT 
+              r.CreatedBy,
+              'DirtyAlumCopperRadiators' as MetalName, 
+              hrm.DirtyAlumCopperRadiatorsWeight as Weight 
+          FROM Receipt r
+          JOIN HVACReceiptMetals hrm ON r.ReceiptID = hrm.ReceiptID
+          WHERE r.PickupDate::date = $1
+          
+          -- Add other metals from HVACReceiptMetals here
+          
+          UNION ALL
+          
+          SELECT 
+              r.CreatedBy,
+              udm.MetalName, 
+              udm.Weight 
+          FROM Receipt r
+          JOIN UserDefinedMetal udm ON r.ReceiptID = udm.ReceiptID
+          WHERE r.PickupDate::date = $1
+      ),
+      AggregatedMetals AS (
+          SELECT 
+              CreatedBy,
+              MetalName,
+              SUM(Weight) as TotalWeight
+          FROM CombinedMetals
+          GROUP BY CreatedBy, MetalName
+      ),
+      TruckTotals AS (
+          SELECT 
+              CreatedBy,
+              SUM(TotalWeight) as TotalWeight
+          FROM AggregatedMetals
+          GROUP BY CreatedBy
+      ),
+      LastReceipts AS (
+          SELECT 
+              CreatedBy,
+              MAX(PickupDate) as LastReceiptDate,
+              MAX(PickupTime) as LastReceiptTime
+          FROM Receipt
+          WHERE PickupDate::date = $1
+          GROUP BY CreatedBy
+      )
+      SELECT 
+          am.CreatedBy,
+          json_object_agg(am.MetalName, am.TotalWeight) as Metals,
+          tt.TotalWeight,
+          lr.LastReceiptDate,
+          lr.LastReceiptTime
+      FROM 
+          AggregatedMetals am
+      JOIN 
+          TruckTotals tt ON am.CreatedBy = tt.CreatedBy
+      JOIN 
+          LastReceipts lr ON am.CreatedBy = lr.CreatedBy
+      GROUP BY 
+          am.CreatedBy, tt.TotalWeight, lr.LastReceiptDate, lr.LastReceiptTime
+  `;
+  
+  const { rows } = await pool.query(query, [date]);
+  return rows.map(row => ({
+      ...row,
+      metals: row.metals,
+      totalWeight: parseFloat(row.totalweight),
+      lastReceiptDate: row.lastreceiptdate,
+      lastReceiptTime: row.lastreceipttime
+  }));
+}
   
   exports.getTopClientsByMetal = async (req, res) => {
     const { metal, limit = 10 } = req.query;

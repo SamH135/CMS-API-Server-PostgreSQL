@@ -17,7 +17,7 @@ router.use(authenticateISACToken);
 // Protected routes
 router.get('/dashboard', asyncHandler(isacController.dashboard));
 
-// Client Rroutes
+// Client Routes
 router.get('/clientList', asyncHandler(isacController.clientList));
 router.get('/clientInfo/:clientID', asyncHandler(isacController.clientInfo));
 router.get('/pickupInfo', asyncHandler(isacController.pickupInfo));
@@ -43,6 +43,11 @@ router.put('/requests/:requestID', asyncHandler(isacController.updateRequest));
 // route info - pickup info routes
 router.get('/searchPickups', asyncHandler(isacController.searchPickups));
 
+// price routes
+router.get('/view-prices', asyncHandler(isacController.getViewPrices));
+
+// truck-load routes
+router.get('/truckLoads', asyncHandler(isacController.getTruckLoads));
 
 // Admin-only routes
 router.use(authorizeRole('admin'));
