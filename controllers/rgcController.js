@@ -325,7 +325,11 @@ exports.createReceipt = async (req, res) => {
     await pool.query('UPDATE Client SET LastPickupDate = CURRENT_DATE WHERE ClientID = $1', [clientID]);
 
     await pool.query('COMMIT');
-    res.json({ message: 'Receipt created successfully', receiptID });
+    res.json({ 
+      message: 'Receipt created successfully', 
+      receiptID,
+      clientLocation: client.rows[0].clientlocation // Add this line
+    });
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('Error creating receipt:', error);

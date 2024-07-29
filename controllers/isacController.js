@@ -937,7 +937,7 @@ async function getUsers() {
     const queryParams = [];
   
     if (term) {
-      query += ` AND c.ClientName ILIKE $${queryParams.length + 1}`;
+      query += ` AND (c.ClientName ILIKE $${queryParams.length + 1} OR r.ReceiptID::text ILIKE $${queryParams.length + 1})`;
       queryParams.push(`%${term}%`);
     }
   
@@ -946,7 +946,7 @@ async function getUsers() {
       queryParams.push(date);
     }
   
-    query += ' ORDER BY r.PickupDate DESC';
+    query += ' ORDER BY r.PickupDate DESC, r.PickupTime DESC';
   
     const { rows } = await pool.query(query, queryParams);
     return rows;
@@ -971,96 +971,6 @@ async function getUsers() {
     `, [`%${term}%`]);
     return rows;
   }
-  
-  // async function getReceiptMetals(clientType, receiptID) {
-  //   if (!clientType) {
-  //     throw new Error('Client type is undefined');
-  //   }
-  
-  //   let query;
-  //   let params = [receiptID];
-  //   let metals = {};
-  
-  //   switch (clientType.toLowerCase()) {
-  //     case 'auto':
-  //       query = `SELECT 
-  //         DrumsRotorsWeight as "Drums & Rotors",
-  //         ShortIronWeight as "Short Iron",
-  //         ShredSteelWeight as "Shred Steel",
-  //         AluminumBreakageWeight as "Aluminum Breakage",
-  //         DirtyAluminumRadiatorsWeight as "Dirty Aluminum Radiators",
-  //         WiringHarnessWeight as "Wiring Harness",
-  //         ACCompressorWeight as "A/C Compressor",
-  //         AlternatorStarterWeight as "Alternator/Starter",
-  //         AluminumRimsWeight as "Aluminum Rims",
-  //         ChromeRimsWeight as "Chrome Rims",
-  //         BrassCopperRadiatorWeight as "Brass Copper Radiator"
-  //       FROM AutoReceiptMetals WHERE ReceiptID = $1`;
-  //       break;
-  
-  //     case 'hvac':
-  //       query = `SELECT 
-  //         ShredSteelWeight as "Shred Steel",
-  //         DirtyAlumCopperRadiatorsWeight as "Dirty Alum/Copper Radiators",
-  //         CleanAluminumRadiatorsWeight as "Clean Aluminum Radiators",
-  //         CopperTwoWeight as "#2 Copper",
-  //         CompressorsWeight as "Compressors",
-  //         DirtyBrassWeight as "Dirty Brass",
-  //         ElectricMotorsWeight as "Electric Motors",
-  //         AluminumBreakageWeight as "Aluminum Breakage"
-  //       FROM HVACReceiptMetals WHERE ReceiptID = $1`;
-  //       break;
-  
-  //     case 'insulation':
-  //       query = `SELECT 
-  //         DumpFee as "Dump Fee",
-  //         HaulFee as "Haul Fee"
-  //       FROM InsulationReceiptMetals WHERE ReceiptID = $1`;
-  //       break;
-  
-  //     default:
-  //       query = `SELECT MetalName as "Metal", Weight, Price
-  //                FROM UserDefinedMetal
-  //                WHERE ReceiptID = $1`;
-  //   }
-  
-  //   console.log('Executing standard metals query:', query);
-  //   console.log('With parameter:', receiptID);
-
-  //   const standardResult = await pool.query(query, params);
-
-  //   // Process standard metals
-  //   if (standardResult.rows.length > 0) {
-  //     const row = standardResult.rows[0];
-  //     Object.entries(row).forEach(([key, value]) => {
-  //       metals[key] = parseFloat(value) || 0;
-  //     });
-  //   }
-
-  //   // Query for custom metals (for all client types)
-  //   const customMetalsQuery = `
-  //     SELECT MetalName as "Metal", Weight
-  //     FROM UserDefinedMetal
-  //     WHERE ReceiptID = $1
-  //   `;
-
-  //   console.log('Executing custom metals query:', customMetalsQuery);
-  //   console.log('With parameter:', receiptID);
-
-  //   const customResult = await pool.query(customMetalsQuery, [receiptID]);
-
-  //   // Add custom metals
-  //   customResult.rows.forEach(row => {
-  //     metals[row.Metal] = parseFloat(row.Weight) || 0;
-  //   });
-
-  //   console.log('Processed metals:', metals);
-
-  //   return metals;
-  // }
-  
-
-
   
   async function getReceiptWithClientType(receiptID) {
     const query = `
