@@ -1279,116 +1279,68 @@ exports.getTruckLoads = async (req, res) => {
 // Helper function to fetch truck loads
 async function fetchTruckLoadsForDate(date) {
   const query = `
-      WITH CombinedMetals AS (
-          SELECT 
-              r.CreatedBy,
-              'DrumsRotors' as MetalName, 
-              arm.DrumsRotorsWeight as Weight 
-          FROM Receipt r
-          JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
-          WHERE r.PickupDate::date = $1
-          
-          UNION ALL
-          
-          SELECT 
-              r.CreatedBy,
-              'ShortIron' as MetalName, 
-              arm.ShortIronWeight as Weight 
-          FROM Receipt r
-          JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
-          WHERE r.PickupDate::date = $1
-          
-          UNION ALL
-          
-          SELECT 
-              r.CreatedBy,
-              'ShredSteel' as MetalName, 
-              arm.ShredSteelWeight as Weight 
-          FROM Receipt r
-          JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
-          WHERE r.PickupDate::date = $1
-          
-          -- Add other metals from AutoReceiptMetals here
-          
-          UNION ALL
-          
-          SELECT 
-              r.CreatedBy,
-              'ShredSteel' as MetalName, 
-              hrm.ShredSteelWeight as Weight 
-          FROM Receipt r
-          JOIN HVACReceiptMetals hrm ON r.ReceiptID = hrm.ReceiptID
-          WHERE r.PickupDate::date = $1
-          
-          UNION ALL
-          
-          SELECT 
-              r.CreatedBy,
-              'DirtyAlumCopperRadiators' as MetalName, 
-              hrm.DirtyAlumCopperRadiatorsWeight as Weight 
-          FROM Receipt r
-          JOIN HVACReceiptMetals hrm ON r.ReceiptID = hrm.ReceiptID
-          WHERE r.PickupDate::date = $1
-          
-          -- Add other metals from HVACReceiptMetals here
-          
-          UNION ALL
-          
-          SELECT 
-              r.CreatedBy,
-              udm.MetalName, 
-              udm.Weight 
-          FROM Receipt r
-          JOIN UserDefinedMetal udm ON r.ReceiptID = udm.ReceiptID
-          WHERE r.PickupDate::date = $1
-      ),
-      AggregatedMetals AS (
-          SELECT 
-              CreatedBy,
-              MetalName,
-              SUM(Weight) as TotalWeight
-          FROM CombinedMetals
-          GROUP BY CreatedBy, MetalName
-      ),
-      TruckTotals AS (
-          SELECT 
-              CreatedBy,
-              SUM(TotalWeight) as TotalWeight
-          FROM AggregatedMetals
-          GROUP BY CreatedBy
-      ),
-      LastReceipts AS (
-          SELECT 
-              CreatedBy,
-              MAX(PickupDate) as LastReceiptDate,
-              MAX(PickupTime) as LastReceiptTime
-          FROM Receipt
-          WHERE PickupDate::date = $1
-          GROUP BY CreatedBy
-      )
+    WITH TruckTotals AS (
       SELECT 
-          am.CreatedBy,
-          json_object_agg(am.MetalName, am.TotalWeight) as Metals,
-          tt.TotalWeight,
-          lr.LastReceiptDate,
-          lr.LastReceiptTime
-      FROM 
-          AggregatedMetals am
-      JOIN 
-          TruckTotals tt ON am.CreatedBy = tt.CreatedBy
-      JOIN 
-          LastReceipts lr ON am.CreatedBy = lr.CreatedBy
-      GROUP BY 
-          am.CreatedBy, tt.TotalWeight, lr.LastReceiptDate, lr.LastReceiptTime
+        CreatedBy,
+        SUM(TotalVolume) as TotalWeight,
+        MAX(PickupDate) as LastReceiptDate,
+        MAX(PickupTime) as LastReceiptTime
+      FROM Receipt
+      WHERE PickupDate::date = $1
+      GROUP BY CreatedBy
+    ),
+    MetalBreakdown AS (
+      SELECT 
+        r.CreatedBy,
+        COALESCE(arm.DrumsRotorsWeight, 0) +
+        COALESCE(arm.ShortIronWeight, 0) +
+        COALESCE(arm.ShredSteelWeight, 0) +
+        COALESCE(arm.AluminumBreakageWeight, 0) +
+        COALESCE(arm.DirtyAluminumRadiatorsWeight, 0) +
+        COALESCE(arm.WiringHarnessWeight, 0) +
+        COALESCE(arm.ACCompressorWeight, 0) +
+        COALESCE(arm.AlternatorStarterWeight, 0) +
+        COALESCE(arm.AluminumRimsWeight, 0) +
+        COALESCE(arm.ChromeRimsWeight, 0) +
+        COALESCE(arm.BrassCopperRadiatorWeight, 0) as AutoWeight,
+        COALESCE(hrm.ShredSteelWeight, 0) +
+        COALESCE(hrm.DirtyAlumCopperRadiatorsWeight, 0) +
+        COALESCE(hrm.CleanAluminumRadiatorsWeight, 0) +
+        COALESCE(hrm.CopperTwoWeight, 0) +
+        COALESCE(hrm.CompressorsWeight, 0) +
+        COALESCE(hrm.DirtyBrassWeight, 0) +
+        COALESCE(hrm.ElectricMotorsWeight, 0) +
+        COALESCE(hrm.AluminumBreakageWeight, 0) as HVACWeight,
+        COALESCE(SUM(udm.Weight), 0) as CustomWeight
+      FROM Receipt r
+      LEFT JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
+      LEFT JOIN HVACReceiptMetals hrm ON r.ReceiptID = hrm.ReceiptID
+      LEFT JOIN UserDefinedMetal udm ON r.ReceiptID = udm.ReceiptID
+      WHERE r.PickupDate::date = $1
+      GROUP BY r.CreatedBy, r.ReceiptID, arm.ReceiptID, hrm.ReceiptID
+    )
+    SELECT 
+      tt.CreatedBy,
+      tt.TotalWeight,
+      tt.LastReceiptDate,
+      tt.LastReceiptTime,
+      json_build_object(
+        'Auto Metals', SUM(mb.AutoWeight),
+        'HVAC Metals', SUM(mb.HVACWeight),
+        'Custom Metals', SUM(mb.CustomWeight)
+      ) as Metals
+    FROM TruckTotals tt
+    JOIN MetalBreakdown mb ON tt.CreatedBy = mb.CreatedBy
+    GROUP BY tt.CreatedBy, tt.TotalWeight, tt.LastReceiptDate, tt.LastReceiptTime
   `;
   
   const { rows } = await pool.query(query, [date]);
   return rows.map(row => ({
-      ...row,
-      metals: row.metals,
-      totalWeight: parseFloat(row.totalweight),
-      lastReceiptDate: row.lastreceiptdate,
-      lastReceiptTime: row.lastreceipttime
+    ...row,
+    metals: row.metals,
+    totalWeight: parseFloat(row.totalweight),
+    lastReceiptDate: row.lastreceiptdate,
+    lastReceiptTime: row.lastreceipttime
   }));
 }
   
