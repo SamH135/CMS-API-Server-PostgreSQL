@@ -1114,6 +1114,59 @@ async function getUsers() {
 
 
 
+// function to make CSV file from receipt/client data
+exports.generateCSV = async (req, res) => {
+  const { startDate, endDate, columnOrder, columnNames } = req.body;
+
+  try {
+    // Fetch all receipts within the date range
+    const query = `
+      SELECT r.ReceiptID, c.ClientName, r.PickupDate, r.PaymentMethod, r.TotalPayout
+      FROM Receipt r
+      JOIN Client c ON r.ClientID = c.ClientID
+      WHERE r.PickupDate::date BETWEEN $1::date AND $2::date
+      ORDER BY r.PickupDate
+    `;
+    
+    const { rows } = await pool.query(query, [startDate, endDate]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'No receipts found for the specified date range.' });
+    }
+
+    // Generate CSV content
+    const csvContent = rows.map(row => {
+      return columnOrder.map(field => {
+        switch(field) {
+          case 'ClientName':
+            return row.clientname || '';
+          case 'PickupDate':
+            return row.pickupdate ? new Date(row.pickupdate).toLocaleDateString() : '';
+          case 'PaymentMethod':
+            return row.paymentmethod || '';
+          case 'TotalPayout':
+            return row.totalpayout ? parseFloat(row.totalpayout).toFixed(2) : '';
+          default:
+            return '';
+        }
+      }).join(',');
+    }).join('\n');
+
+    const header = columnOrder.map(field => columnNames[field]).join(',');
+    const fullCSV = header + '\n' + csvContent;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=receipts.csv');
+    res.status(200).send(fullCSV);
+  } catch (error) {
+    console.error('Error generating CSV:', error);
+    res.status(500).json({ message: 'An error occurred while generating the CSV file.' });
+  }
+};
+
+
+
+
   /*******************************************************
    *                     REQUESTS                        *
    *                                                     *

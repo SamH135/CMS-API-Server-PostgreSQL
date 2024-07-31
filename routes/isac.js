@@ -68,6 +68,11 @@ router.post('/auto-prices', asyncHandler(isacController.setAutoPrices));
 router.post('/update-shred-steel-price', asyncHandler(isacController.updateShredSteelPrice));
 router.post('/adjustInsulationFee', asyncHandler(isacController.adjustInsulationFee));
 
+
+// CSV generation routes
+router.post('/generate-csv', asyncHandler(isacController.generateCSV));
+
+
 // Data analytic routes - these are currently not being used
 router.get('/top-clients-by-metal', asyncHandler(isacController.getTopClientsByMetal));
 router.get('/top-clients-by-volume', asyncHandler(isacController.getTopClientsByVolume));
