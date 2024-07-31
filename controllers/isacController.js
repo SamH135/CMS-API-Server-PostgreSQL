@@ -3,6 +3,10 @@ const pool = require("../db");
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
+// imports for time zone specific date operations
+const { parseISO, format, startOfDay, endOfDay } = require('date-fns');
+const { formatInTimeZone, toDate, fromZonedTime } = require('date-fns-tz');
+
 
 
 /*******************************************************
@@ -1062,12 +1066,12 @@ async function getUsers() {
 
   exports.searchPickups = async (req, res) => {
     try {
-      const { term, date } = req.query;
+      const { term, date, timeZone } = req.query;
       let query;
       let queryParams;
   
       if (term) {
-        // Search by client name or location
+        // Search by client name or location (no changes needed here)
         query = `
           WITH RankedReceipts AS (
             SELECT r.*, c.ClientName, c.ClientLocation, c.NeedsPickup,
@@ -1080,18 +1084,23 @@ async function getUsers() {
           ORDER BY PickupDate DESC, PickupTime DESC
         `;
         queryParams = [`%${term}%`];
-      } else if (date) {
-        // Search by date
+      } else if (date && timeZone) {
+        // Search by date, considering the time zone
+        const userDate = toDate(date, { timeZone });
+        const startOfDayUTC = formatInTimeZone(userDate, timeZone, "yyyy-MM-dd'T'00:00:00XXX");
+        const endOfDayUTC = formatInTimeZone(userDate, timeZone, "yyyy-MM-dd'T'23:59:59XXX");
+  
         query = `
           SELECT r.*, c.ClientName, c.ClientLocation, c.NeedsPickup
           FROM Receipt r
           JOIN Client c ON r.ClientID = c.ClientID
-          WHERE r.PickupDate::date = $1
+          WHERE r.PickupTime >= $1::timestamp WITH TIME ZONE
+            AND r.PickupTime < $2::timestamp WITH TIME ZONE
           ORDER BY r.PickupTime DESC
         `;
-        queryParams = [date];
+        queryParams = [startOfDayUTC, endOfDayUTC];
       } else {
-        throw new Error('Either term or date must be provided');
+        throw new Error('Either term or both date and timeZone must be provided');
       }
   
       const { rows } = await pool.query(query, queryParams);
@@ -1264,9 +1273,7 @@ async function getUsers() {
    *                                                     *
    *    Functions for data analysis and reporting        *
    *******************************************************/
-  const { parseISO, format, startOfDay, endOfDay } = require('date-fns');
-  const { formatInTimeZone, toDate, fromZonedTime } = require('date-fns-tz');
-  
+
   exports.getTruckLoads = async (req, res) => {
     const { date, timeZone } = req.query;
     if (!date || !timeZone) {
