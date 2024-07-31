@@ -1265,84 +1265,97 @@ async function getUsers() {
    *    Functions for data analysis and reporting        *
    *******************************************************/
 
-exports.getTruckLoads = async (req, res) => {
-  const { date } = req.query;
-  try {
-      const truckLoads = await fetchTruckLoadsForDate(date);
+  const { formatInTimeZone, toDate } = require('date-fns-tz');
+  const { startOfDay, endOfDay } = require('date-fns');
+  
+  exports.getTruckLoads = async (req, res) => {
+    const { date, timeZone } = req.query;
+    if (!date || !timeZone) {
+      return res.status(400).json({ message: 'Date and time zone are required' });
+    }
+  
+    try {
+      const truckLoads = await fetchTruckLoadsForDate(date, timeZone);
       res.status(200).json({ truckLoads });
-  } catch (error) {
+    } catch (error) {
       console.error('Error fetching truck loads:', error);
       res.status(500).json({ message: 'Internal Server Error' });
-  }
-};
-
-// Helper function to fetch truck loads
-async function fetchTruckLoadsForDate(date) {
-  const query = `
-    WITH TruckTotals AS (
-      SELECT 
-        CreatedBy,
-        SUM(TotalVolume) as TotalWeight,
-        MAX(PickupDate) as LastReceiptDate,
-        MAX(PickupTime) as LastReceiptTime
-      FROM Receipt
-      WHERE PickupDate::date = $1
-      GROUP BY CreatedBy
-    ),
-    MetalBreakdown AS (
-      SELECT 
-        r.CreatedBy,
-        COALESCE(arm.DrumsRotorsWeight, 0) +
-        COALESCE(arm.ShortIronWeight, 0) +
-        COALESCE(arm.ShredSteelWeight, 0) +
-        COALESCE(arm.AluminumBreakageWeight, 0) +
-        COALESCE(arm.DirtyAluminumRadiatorsWeight, 0) +
-        COALESCE(arm.WiringHarnessWeight, 0) +
-        COALESCE(arm.ACCompressorWeight, 0) +
-        COALESCE(arm.AlternatorStarterWeight, 0) +
-        COALESCE(arm.AluminumRimsWeight, 0) +
-        COALESCE(arm.ChromeRimsWeight, 0) +
-        COALESCE(arm.BrassCopperRadiatorWeight, 0) as AutoWeight,
-        COALESCE(hrm.ShredSteelWeight, 0) +
-        COALESCE(hrm.DirtyAlumCopperRadiatorsWeight, 0) +
-        COALESCE(hrm.CleanAluminumRadiatorsWeight, 0) +
-        COALESCE(hrm.CopperTwoWeight, 0) +
-        COALESCE(hrm.CompressorsWeight, 0) +
-        COALESCE(hrm.DirtyBrassWeight, 0) +
-        COALESCE(hrm.ElectricMotorsWeight, 0) +
-        COALESCE(hrm.AluminumBreakageWeight, 0) as HVACWeight,
-        COALESCE(SUM(udm.Weight), 0) as CustomWeight
-      FROM Receipt r
-      LEFT JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
-      LEFT JOIN HVACReceiptMetals hrm ON r.ReceiptID = hrm.ReceiptID
-      LEFT JOIN UserDefinedMetal udm ON r.ReceiptID = udm.ReceiptID
-      WHERE r.PickupDate::date = $1
-      GROUP BY r.CreatedBy, r.ReceiptID, arm.ReceiptID, hrm.ReceiptID
-    )
-    SELECT 
-      tt.CreatedBy,
-      tt.TotalWeight,
-      tt.LastReceiptDate,
-      tt.LastReceiptTime,
-      json_build_object(
-        'Auto Metals', SUM(mb.AutoWeight),
-        'HVAC Metals', SUM(mb.HVACWeight),
-        'Custom Metals', SUM(mb.CustomWeight)
-      ) as Metals
-    FROM TruckTotals tt
-    JOIN MetalBreakdown mb ON tt.CreatedBy = mb.CreatedBy
-    GROUP BY tt.CreatedBy, tt.TotalWeight, tt.LastReceiptDate, tt.LastReceiptTime
-  `;
+    }
+  };
   
-  const { rows } = await pool.query(query, [date]);
-  return rows.map(row => ({
-    ...row,
-    metals: row.metals,
-    totalWeight: parseFloat(row.totalweight),
-    lastReceiptDate: row.lastreceiptdate,
-    lastReceiptTime: row.lastreceipttime
-  }));
-}
+  async function fetchTruckLoadsForDate(date, timeZone) {
+    const localDate = toDate(date, { timeZone });
+    const startOfDayLocal = startOfDay(localDate);
+    const endOfDayLocal = endOfDay(localDate);
+  
+    const startOfDayUTC = formatInTimeZone(startOfDayLocal, timeZone, "yyyy-MM-dd'T'HH:mm:ss'Z'");
+    const endOfDayUTC = formatInTimeZone(endOfDayLocal, timeZone, "yyyy-MM-dd'T'HH:mm:ss'Z'");
+  
+    const query = `
+      WITH TruckTotals AS (
+        SELECT 
+          CreatedBy,
+          SUM(TotalVolume) as TotalWeight,
+          MAX(PickupDate) as LastReceiptDate,
+          MAX(PickupTime) as LastReceiptTime
+        FROM Receipt
+        WHERE PickupTime >= $1::timestamp AND PickupTime < $2::timestamp
+        GROUP BY CreatedBy
+      ),
+      MetalBreakdown AS (
+        SELECT 
+          r.CreatedBy,
+          COALESCE(arm.DrumsRotorsWeight, 0) +
+          COALESCE(arm.ShortIronWeight, 0) +
+          COALESCE(arm.ShredSteelWeight, 0) +
+          COALESCE(arm.AluminumBreakageWeight, 0) +
+          COALESCE(arm.DirtyAluminumRadiatorsWeight, 0) +
+          COALESCE(arm.WiringHarnessWeight, 0) +
+          COALESCE(arm.ACCompressorWeight, 0) +
+          COALESCE(arm.AlternatorStarterWeight, 0) +
+          COALESCE(arm.AluminumRimsWeight, 0) +
+          COALESCE(arm.ChromeRimsWeight, 0) +
+          COALESCE(arm.BrassCopperRadiatorWeight, 0) as AutoWeight,
+          COALESCE(hrm.ShredSteelWeight, 0) +
+          COALESCE(hrm.DirtyAlumCopperRadiatorsWeight, 0) +
+          COALESCE(hrm.CleanAluminumRadiatorsWeight, 0) +
+          COALESCE(hrm.CopperTwoWeight, 0) +
+          COALESCE(hrm.CompressorsWeight, 0) +
+          COALESCE(hrm.DirtyBrassWeight, 0) +
+          COALESCE(hrm.ElectricMotorsWeight, 0) +
+          COALESCE(hrm.AluminumBreakageWeight, 0) as HVACWeight,
+          COALESCE(SUM(udm.Weight), 0) as CustomWeight
+        FROM Receipt r
+        LEFT JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
+        LEFT JOIN HVACReceiptMetals hrm ON r.ReceiptID = hrm.ReceiptID
+        LEFT JOIN UserDefinedMetal udm ON r.ReceiptID = udm.ReceiptID
+        WHERE r.PickupTime >= $1::timestamp AND r.PickupTime < $2::timestamp
+        GROUP BY r.CreatedBy, r.ReceiptID, arm.ReceiptID, hrm.ReceiptID
+      )
+      SELECT 
+        tt.CreatedBy,
+        tt.TotalWeight,
+        tt.LastReceiptDate,
+        tt.LastReceiptTime,
+        json_build_object(
+          'Auto Metals', SUM(mb.AutoWeight),
+          'HVAC Metals', SUM(mb.HVACWeight),
+          'Custom Metals', SUM(mb.CustomWeight)
+        ) as Metals
+      FROM TruckTotals tt
+      JOIN MetalBreakdown mb ON tt.CreatedBy = mb.CreatedBy
+      GROUP BY tt.CreatedBy, tt.TotalWeight, tt.LastReceiptDate, tt.LastReceiptTime
+    `;
+    
+    const { rows } = await pool.query(query, [startOfDayUTC, endOfDayUTC]);
+    return rows.map(row => ({
+      ...row,
+      metals: row.metals,
+      totalWeight: parseFloat(row.totalweight),
+      lastReceiptDate: row.lastreceiptdate,
+      lastReceiptTime: row.lastreceipttime
+    }));
+  }
   
   exports.getTopClientsByMetal = async (req, res) => {
     const { metal, limit = 10 } = req.query;
