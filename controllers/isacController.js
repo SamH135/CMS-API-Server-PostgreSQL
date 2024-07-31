@@ -1264,9 +1264,8 @@ async function getUsers() {
    *                                                     *
    *    Functions for data analysis and reporting        *
    *******************************************************/
-
-  const { formatInTimeZone, toDate } = require('date-fns-tz');
-  const { startOfDay, endOfDay } = require('date-fns');
+  const { parseISO, format, startOfDay, endOfDay } = require('date-fns');
+  const { formatInTimeZone, toDate, fromZonedTime } = require('date-fns-tz');
   
   exports.getTruckLoads = async (req, res) => {
     const { date, timeZone } = req.query;
@@ -1284,12 +1283,24 @@ async function getUsers() {
   };
   
   async function fetchTruckLoadsForDate(date, timeZone) {
-    const localDate = toDate(date, { timeZone });
-    const startOfDayLocal = startOfDay(localDate);
-    const endOfDayLocal = endOfDay(localDate);
+    console.log('Received from frontend:', { date, timeZone });
   
-    const startOfDayUTC = formatInTimeZone(startOfDayLocal, timeZone, "yyyy-MM-dd'T'HH:mm:ss'Z'");
-    const endOfDayUTC = formatInTimeZone(endOfDayLocal, timeZone, "yyyy-MM-dd'T'HH:mm:ss'Z'");
+    // Parse the input date as if it were in the user's time zone
+    const userDate = toDate(date, { timeZone });
+    
+    // Create start and end of day in user's time zone
+    const startOfDayLocal = startOfDay(userDate);
+    const endOfDayLocal = endOfDay(userDate);
+    
+    // Convert start and end of day to UTC
+    const startOfDayUTC = fromZonedTime(startOfDayLocal, timeZone);
+    const endOfDayUTC = fromZonedTime(endOfDayLocal, timeZone);
+  
+    // Format UTC dates for SQL query
+    const startOfDayUTCString = formatInTimeZone(startOfDayUTC, 'UTC', "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
+    const endOfDayUTCString = formatInTimeZone(endOfDayUTC, 'UTC', "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
+  
+    console.log('Query date range:', startOfDayUTCString, 'to', endOfDayUTCString);
   
     const query = `
       WITH TruckTotals AS (
@@ -1299,7 +1310,8 @@ async function getUsers() {
           MAX(PickupDate) as LastReceiptDate,
           MAX(PickupTime) as LastReceiptTime
         FROM Receipt
-        WHERE PickupTime >= $1::timestamp AND PickupTime < $2::timestamp
+        WHERE PickupTime >= $1::timestamp WITH TIME ZONE 
+          AND PickupTime < $2::timestamp WITH TIME ZONE
         GROUP BY CreatedBy
       ),
       MetalBreakdown AS (
@@ -1329,7 +1341,8 @@ async function getUsers() {
         LEFT JOIN AutoReceiptMetals arm ON r.ReceiptID = arm.ReceiptID
         LEFT JOIN HVACReceiptMetals hrm ON r.ReceiptID = hrm.ReceiptID
         LEFT JOIN UserDefinedMetal udm ON r.ReceiptID = udm.ReceiptID
-        WHERE r.PickupTime >= $1::timestamp AND r.PickupTime < $2::timestamp
+        WHERE r.PickupTime >= $1::timestamp WITH TIME ZONE 
+          AND r.PickupTime < $2::timestamp WITH TIME ZONE
         GROUP BY r.CreatedBy, r.ReceiptID, arm.ReceiptID, hrm.ReceiptID
       )
       SELECT 
@@ -1347,7 +1360,7 @@ async function getUsers() {
       GROUP BY tt.CreatedBy, tt.TotalWeight, tt.LastReceiptDate, tt.LastReceiptTime
     `;
     
-    const { rows } = await pool.query(query, [startOfDayUTC, endOfDayUTC]);
+    const { rows } = await pool.query(query, [startOfDayUTCString, endOfDayUTCString]);
     return rows.map(row => ({
       ...row,
       metals: row.metals,
