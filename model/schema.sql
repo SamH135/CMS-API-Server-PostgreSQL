@@ -89,6 +89,17 @@ CREATE INDEX ON Receipt (ClientID);
 CREATE INDEX ON Receipt (PickupDate);
 CREATE INDEX ON Receipt (TotalPayout);
 
+
+-- CREATE CheckPayments table - stores check numbers for receipts 
+-- corresponding to clients who have "Check" as their payment method
+-- used in CSV generation
+CREATE TABLE CheckPayments (
+  CheckPaymentID SERIAL PRIMARY KEY,
+  ReceiptID INT NOT NULL,
+  CheckNumber VARCHAR(50) NOT NULL,
+  FOREIGN KEY (ReceiptID) REFERENCES Receipt(ReceiptID)
+);
+
 -- Create UserDefinedMetal table - allows employees to add custom metals to receipts
 CREATE TABLE UserDefinedMetal (
   UserMetalID SERIAL PRIMARY KEY,

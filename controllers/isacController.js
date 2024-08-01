@@ -157,15 +157,20 @@ exports.updateClient = async (req, res) => {
 
 exports.pickupInfo = async (req, res) => {
   try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 31);
+
     const query = `
       SELECT r.ReceiptID, r.ClientID, c.ClientName, c.ClientLocation, 
              r.PickupDate, r.PickupTime, c.NeedsPickup, r.CreatedBy
       FROM Receipt r
       JOIN Client c ON r.ClientID = c.ClientID
+      WHERE r.PickupDate >= $1
       ORDER BY r.PickupDate DESC, r.PickupTime DESC
+      LIMIT 1000
     `;
 
-    const { rows } = await pool.query(query);
+    const { rows } = await pool.query(query, [thirtyDaysAgo]);
     res.status(200).json({ receipts: rows });
   } catch (error) {
     console.error('Error retrieving pickup information:', error);
