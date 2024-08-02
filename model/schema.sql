@@ -78,7 +78,7 @@ CREATE TABLE Receipt (
   ClientID VARCHAR(20) NOT NULL, 
   PaymentMethod VARCHAR(20), -- Set based on client payment method when created
   TotalVolume DECIMAL(10, 2) CHECK (TotalVolume >= 0),
-  TotalPayout DECIMAL(10, 2) CHECK (TotalPayout >= 0),
+  TotalPayout DECIMAL(10, 2),
   PickupDate DATE NOT NULL,
   PickupTime TIMESTAMP NOT NULL,
   CreatedBy VARCHAR(50) NOT NULL,
