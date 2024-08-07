@@ -672,50 +672,110 @@ async function getUsers() {
  *       Functions for price set/get operations          *
  *******************************************************/
 
-  exports.getHVACPrices = async (req, res) => {
-    try {
-      const query = 'SELECT * FROM SetHVACPrices';
-      const { rows } = await pool.query(query);
-      res.status(200).json(rows[0] || {});
-    } catch (error) {
-      console.error('Error retrieving HVAC prices:', error);
-      res.status(500).json({ message: 'Internal Server Error' });
-    }
-  };
+
+
+exports.getHVACPrices = async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        ShredSteelPrice as "Shred Steel",
+        DirtyAlumCopperRadiatorsPrice as "Dirty Alum/Copper Radiators",
+        CleanAluminumRadiatorsPrice as "Clean Aluminum Radiators",
+        CopperTwoPrice as "#2 Copper",
+        CompressorsPrice as "Compressors",
+        DirtyBrassPrice as "Dirty Brass",
+        ElectricMotorsPrice as "Electric Motors",
+        AluminumBreakagePrice as "Aluminum Breakage"
+      FROM SetHVACPrices
+    `;
+    const { rows } = await pool.query(query);
+    res.status(200).json(rows[0] || {});
+  } catch (error) {
+    console.error('Error retrieving HVAC prices:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
   
-  exports.setHVACPrices = async (req, res) => {
-    try {
-      const prices = req.body;
-      const query = `
-        UPDATE SetHVACPrices SET
-        ShredSteelPrice = $1, DirtyAlumCopperRadiatorsPrice = $2,
-        CleanAluminumRadiatorsPrice = $3, CopperTwoPrice = $4, 
-        CompressorsPrice = $5, DirtyBrassPrice = $6, 
-        ElectricMotorsPrice = $7, AluminumBreakagePrice = $8
-      `;
-      await pool.query(query, [
-        prices.shredsteelprice, prices.dirtyalumcopperradiatorsprice,
-        prices.cleanaluminumradiatorsprice, prices.coppertwoprice,
-        prices.compressorsprice, prices.dirtybrassprice,
-        prices.electricmotorsprice, prices.aluminumbreakageprice
-      ]);
-  
-      // Update Auto prices table with new shred steel price
-      await pool.query(`
+exports.setHVACPrices = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const prices = req.body;
+    const query = `
+      UPDATE SetHVACPrices SET
+      ShredSteelPrice = $1,
+      DirtyAlumCopperRadiatorsPrice = $2,
+      CleanAluminumRadiatorsPrice = $3,
+      CopperTwoPrice = $4,
+      CompressorsPrice = $5,
+      DirtyBrassPrice = $6,
+      ElectricMotorsPrice = $7,
+      AluminumBreakagePrice = $8
+      RETURNING ShredSteelPrice
+    `;
+    const result = await client.query(query, [
+      prices['Shred Steel'],
+      prices['Dirty Alum/Copper Radiators'],
+      prices['Clean Aluminum Radiators'],
+      prices['#2 Copper'],
+      prices['Compressors'],
+      prices['Dirty Brass'],
+      prices['Electric Motors'],
+      prices['Aluminum Breakage']
+    ]);
+
+    const newShredSteelPrice = result.rows[0].shredsteelprice;
+
+    // Get the current Auto shred steel price
+    const autoQuery = 'SELECT ShredSteelPrice FROM SetAutoPrices';
+    const autoResult = await client.query(autoQuery);
+    const currentAutoShredSteelPrice = autoResult.rows[0].shredsteelprice;
+
+    let shredSteelUpdated = false;
+
+    // Update Auto prices table with new shred steel price if it's different
+    if (newShredSteelPrice !== currentAutoShredSteelPrice) {
+      await client.query(`
         UPDATE SetAutoPrices
         SET ShredSteelPrice = $1
-      `, [prices.shredsteelprice]);
-  
-      res.status(200).json({ message: 'HVAC prices updated successfully. Shred steel price also updated in Auto prices.' });
-    } catch (error) {
-      console.error('Error setting HVAC prices:', error);
-      res.status(500).json({ message: 'Internal Server Error' });
+      `, [newShredSteelPrice]);
+      shredSteelUpdated = true;
     }
-  };
+
+    await client.query('COMMIT');
+
+    const message = shredSteelUpdated
+      ? 'HVAC prices updated successfully. Shred steel price also updated in Auto prices.'
+      : 'HVAC prices updated successfully.';
+
+    res.status(200).json({ message });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error setting HVAC prices:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  } finally {
+    client.release();
+  }
+};
   
   exports.getAutoPrices = async (req, res) => {
     try {
-      const query = 'SELECT * FROM SetAutoPrices';
+      const query = `
+        SELECT 
+          DrumsRotorsPrice as "Drums & Rotors",
+          ShortIronPrice as "Short Iron",
+          ShredSteelPrice as "Shred Steel",
+          AluminumBreakagePrice as "Aluminum Breakage",
+          DirtyAluminumRadiatorsPrice as "Dirty Aluminum Radiators",
+          WiringHarnessPrice as "Wiring Harness",
+          ACCompressorPrice as "A/C Compressor",
+          AlternatorStarterPrice as "Alternator/Starter",
+          AluminumRimsPrice as "Aluminum Rims",
+          ChromeRimsPrice as "Chrome Rims",
+          BrassCopperRadiatorPrice as "Brass Copper Radiator"
+        FROM SetAutoPrices
+      `;
       const { rows } = await pool.query(query);
       res.status(200).json(rows[0] || {});
     } catch (error) {
@@ -725,34 +785,71 @@ async function getUsers() {
   };
   
   exports.setAutoPrices = async (req, res) => {
+    const client = await pool.connect();
     try {
+      await client.query('BEGIN');
+  
       const prices = req.body;
       const query = `
         UPDATE SetAutoPrices SET
-        DrumsRotorsPrice = $1, ShortIronPrice = $2, ShredSteelPrice = $3,
-        AluminumBreakagePrice = $4, DirtyAluminumRadiatorsPrice = $5, 
-        WiringHarnessPrice = $6, ACCompressorPrice = $7, 
-        AlternatorStarterPrice = $8, AluminumRimsPrice = $9,
-        ChromeRimsPrice = $10, BrassCopperRadiatorPrice = $11
+        DrumsRotorsPrice = $1,
+        ShortIronPrice = $2,
+        ShredSteelPrice = $3,
+        AluminumBreakagePrice = $4,
+        DirtyAluminumRadiatorsPrice = $5,
+        WiringHarnessPrice = $6,
+        ACCompressorPrice = $7,
+        AlternatorStarterPrice = $8,
+        AluminumRimsPrice = $9,
+        ChromeRimsPrice = $10,
+        BrassCopperRadiatorPrice = $11
+        RETURNING ShredSteelPrice
       `;
-      await pool.query(query, [
-        prices.drumsrotorsprice, prices.shortironprice, prices.shredsteelprice,
-        prices.aluminumbreakageprice, prices.dirtyaluminumradiatorsprice,
-        prices.wiringharnessprice, prices.accompressorprice,
-        prices.alternatorstarterprice, prices.aluminumrimsprice,
-        prices.chromerimsprice, prices.brasscopperradiatorprice
+      const result = await client.query(query, [
+        prices['Drums & Rotors'],
+        prices['Short Iron'],
+        prices['Shred Steel'],
+        prices['Aluminum Breakage'],
+        prices['Dirty Aluminum Radiators'],
+        prices['Wiring Harness'],
+        prices['A/C Compressor'],
+        prices['Alternator/Starter'],
+        prices['Aluminum Rims'],
+        prices['Chrome Rims'],
+        prices['Brass Copper Radiator']
       ]);
   
-      // Update HVAC prices table with new shred steel price
-      await pool.query(`
-        UPDATE SetHVACPrices
-        SET ShredSteelPrice = $1
-      `, [prices.shredsteelprice]);
+      const newShredSteelPrice = result.rows[0].shredsteelprice;
   
-      res.status(200).json({ message: 'Auto prices updated successfully. Shred steel price also updated in HVAC prices.' });
+      // Get the current HVAC shred steel price
+      const hvacQuery = 'SELECT ShredSteelPrice FROM SetHVACPrices';
+      const hvacResult = await client.query(hvacQuery);
+      const currentHVACShredSteelPrice = hvacResult.rows[0].shredsteelprice;
+  
+      let shredSteelUpdated = false;
+  
+      // Update HVAC prices table with new shred steel price if it's different
+      if (newShredSteelPrice !== currentHVACShredSteelPrice) {
+        await client.query(`
+          UPDATE SetHVACPrices
+          SET ShredSteelPrice = $1
+        `, [newShredSteelPrice]);
+        shredSteelUpdated = true;
+      }
+  
+      await client.query('COMMIT');
+  
+      const message = shredSteelUpdated
+        ? 'Auto prices updated successfully. Shred steel price also updated in HVAC prices.'
+        : 'Auto prices updated successfully.';
+  
+      res.status(200).json({ message });
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('Error setting Auto prices:', error);
       res.status(500).json({ message: 'Internal Server Error' });
+    } finally {
+      client.release();
     }
   };
 
@@ -1124,11 +1221,21 @@ exports.generateCSV = async (req, res) => {
   const { startDate, endDate, columnOrder, columnNames } = req.body;
 
   try {
+    // Check for unresolved checks
+    const unresolvedChecks = await checkUnresolvedChecks(startDate, endDate);
+    if (unresolvedChecks.length > 0) {
+      return res.status(400).json({ 
+        message: 'Unresolved checks found. Please resolve before generating CSV.', 
+        unresolvedChecks 
+      });
+    }
+
     // Fetch all receipts within the date range
     const query = `
-      SELECT r.ReceiptID, c.ClientName, r.PickupDate, r.PaymentMethod, r.TotalPayout
+      SELECT r.ReceiptID, c.ClientName, r.PickupDate, c.PaymentMethod, r.TotalPayout, cp.CheckNumber
       FROM Receipt r
       JOIN Client c ON r.ClientID = c.ClientID
+      LEFT JOIN CheckPayments cp ON r.ReceiptID = cp.ReceiptID
       WHERE r.PickupDate::date BETWEEN $1::date AND $2::date
       ORDER BY r.PickupDate
     `;
@@ -1141,6 +1248,7 @@ exports.generateCSV = async (req, res) => {
 
     // Generate CSV content
     const csvContent = rows.map(row => {
+      const paymentMethod = row.checknumber ? 'Check' : row.paymentmethod;
       return columnOrder.map(field => {
         switch(field) {
           case 'ClientName':
@@ -1148,9 +1256,11 @@ exports.generateCSV = async (req, res) => {
           case 'PickupDate':
             return row.pickupdate ? new Date(row.pickupdate).toLocaleDateString() : '';
           case 'PaymentMethod':
-            return row.paymentmethod || '';
+            return paymentMethod || '';
           case 'TotalPayout':
             return row.totalpayout ? parseFloat(row.totalpayout).toFixed(2) : '';
+          case 'CheckNumber':
+            return row.checknumber || '';
           default:
             return '';
         }
@@ -1166,6 +1276,39 @@ exports.generateCSV = async (req, res) => {
   } catch (error) {
     console.error('Error generating CSV:', error);
     res.status(500).json({ message: 'An error occurred while generating the CSV file.' });
+  }
+};
+
+async function checkUnresolvedChecks(startDate, endDate) {
+  const query = `
+    SELECT r.ReceiptID, c.ClientName, r.PickupDate
+    FROM Receipt r
+    JOIN Client c ON r.ClientID = c.ClientID
+    JOIN CheckPayments cp ON r.ReceiptID = cp.ReceiptID
+    WHERE r.PickupDate::date BETWEEN $1::date AND $2::date AND cp.CheckNumber = '0000'
+  `;
+  const { rows } = await pool.query(query, [startDate, endDate]);
+  return rows;
+}
+
+
+exports.updateReceipt = async (req, res) => {
+  const { receiptid, totalpayout, paymentmethod } = req.body;
+  try {
+    const query = `
+      UPDATE Receipt
+      SET TotalPayout = $1, PaymentMethod = $2
+      WHERE ReceiptID = $3
+      RETURNING *
+    `;
+    const { rows } = await pool.query(query, [totalpayout, paymentmethod, receiptid]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Receipt not found' });
+    }
+    res.status(200).json({ message: 'Receipt updated successfully', receipt: rows[0] });
+  } catch (error) {
+    console.error('Error updating receipt:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 };
 
@@ -1535,6 +1678,105 @@ exports.manualUpdatePickupDate = async (req, res) => {
   } catch (error) {
     console.error('Error manually updating pickup date:', error);
     res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+
+
+
+
+
+/*******************************************************
+ *                 Check Payments                      *
+ *                                                     *
+ *   Functions for check number/check payment logic    *
+ *******************************************************/
+exports.getCheckPayment = async (req, res) => {
+  const { receiptID } = req.params;
+  try {
+    const query = 'SELECT CheckNumber FROM CheckPayments WHERE ReceiptID = $1';
+    const { rows } = await pool.query(query, [receiptID]);
+    res.json({ checkNumber: rows[0]?.checknumber || '' });
+  } catch (error) {
+    console.error('Error fetching check payment:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+exports.getUnresolvedChecks = async (req, res) => {
+  try {
+    const query = `
+      SELECT r.ReceiptID, c.ClientName, r.PickupDate
+      FROM Receipt r
+      JOIN Client c ON r.ClientID = c.ClientID
+      JOIN CheckPayments cp ON r.ReceiptID = cp.ReceiptID
+      WHERE cp.CheckNumber = '0000'
+      ORDER BY r.PickupDate DESC
+    `;
+    const { rows } = await pool.query(query);
+    res.status(200).json({ unresolvedChecks: rows });
+  } catch (error) {
+    console.error('Error fetching unresolved checks:', error);
+    res.status(500).json({ message: 'Error fetching unresolved checks' });
+  }
+};
+
+exports.updateCheckNumber = async (req, res) => {
+  const { receiptID, checkNumber } = req.body;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    console.log(`Updating check number for receipt ${receiptID} to ${checkNumber}`);
+
+    // Check if a record exists
+    const checkExistingQuery = `
+      SELECT * FROM CheckPayments WHERE ReceiptID = $1
+    `;
+    const existingResult = await client.query(checkExistingQuery, [receiptID]);
+
+    let result;
+    if (existingResult.rows.length > 0) {
+      console.log(`Existing check payment found for receipt ${receiptID}. Updating...`);
+      // Update existing record
+      const updateQuery = `
+        UPDATE CheckPayments
+        SET CheckNumber = $1
+        WHERE ReceiptID = $2
+        RETURNING *
+      `;
+      result = await client.query(updateQuery, [checkNumber, receiptID]);
+    } else {
+      console.log(`No existing check payment found for receipt ${receiptID}. Inserting new record...`);
+      // Insert new record
+      const insertQuery = `
+        INSERT INTO CheckPayments (ReceiptID, CheckNumber)
+        VALUES ($1, $2)
+        RETURNING *
+      `;
+      result = await client.query(insertQuery, [receiptID, checkNumber]);
+    }
+
+    console.log(`Check payment operation result:`, result.rows[0]);
+
+    // Update the Receipt table to reflect that it's paid by check
+    const updateReceiptQuery = `
+      UPDATE Receipt
+      SET PaymentMethod = 'Check'
+      WHERE ReceiptID = $1
+    `;
+    await client.query(updateReceiptQuery, [receiptID]);
+
+    await client.query('COMMIT');
+
+    res.status(200).json({ message: 'Check number updated successfully', checkPayment: result.rows[0] });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error updating check number:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message, stack: error.stack });
+  } finally {
+    client.release();
   }
 };
 

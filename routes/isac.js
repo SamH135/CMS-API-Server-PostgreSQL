@@ -34,6 +34,8 @@ router.get('/customMetals/:receiptID', asyncHandler(isacController.customMetals)
 router.get('/catalyticConverters/:receiptID', asyncHandler(isacController.catalyticConverters));
 router.get('/getReceiptByClientAndDate', asyncHandler(isacController.getReceiptByClientAndDate));
 
+router.get('/checkPayment/:receiptID', asyncHandler(isacController.getCheckPayment));
+
 // Request routes
 router.get('/requests', asyncHandler(isacController.getRequests));
 router.get('/requests/:requestID', asyncHandler(isacController.getRequestById));
@@ -72,6 +74,12 @@ router.post('/adjustInsulationFee', asyncHandler(isacController.adjustInsulation
 // CSV generation routes
 router.post('/generate-csv', asyncHandler(isacController.generateCSV));
 
+// Check payment logic routes
+router.get('/api/unresolved-checks', isacController.getUnresolvedChecks);
+router.post('/api/update-check-number', isacController.updateCheckNumber);
+
+router.post('/updateReceipt', asyncHandler(isacController.updateReceipt));
+router.post('/updateCheckNumber', asyncHandler(isacController.updateCheckNumber));
 
 // Data analytic routes - these are currently not being used
 router.get('/top-clients-by-metal', asyncHandler(isacController.getTopClientsByMetal));

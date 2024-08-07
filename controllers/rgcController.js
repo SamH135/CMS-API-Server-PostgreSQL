@@ -86,13 +86,13 @@ exports.searchClients = async (req, res) => {
 
 // Helper functions
 async function getClients() {
-  const { rows } = await pool.query('SELECT ClientID, ClientName, ClientLocation, ClientType FROM Client WHERE ClientType != \'insulation\'');
+  const { rows } = await pool.query('SELECT ClientID, ClientName, ClientLocation, ClientType, PaymentMethod FROM Client WHERE ClientType != \'insulation\'');
   return rows;
 }
 
 async function searchClientsByTerm(term) {
   const { rows } = await pool.query(`
-    SELECT ClientID, ClientName, ClientLocation, ClientType
+    SELECT ClientID, ClientName, ClientLocation, ClientType, PaymentMethod
     FROM Client
     WHERE (ClientName ILIKE $1 OR ClientID::text ILIKE $1 OR ClientLocation ILIKE $1)
     AND ClientType != 'insulation'
@@ -180,7 +180,7 @@ exports.getMetalPrices = async (req, res) => {
 
 
 
-// rgcController.js
+
 
 exports.createReceipt = async (req, res) => {
   const { 
@@ -190,7 +190,8 @@ exports.createReceipt = async (req, res) => {
     totalVolume,
     metals, 
     userDefinedMetals, 
-    catalyticConverters 
+    catalyticConverters,
+    checkNumber 
   } = req.body;
 
   const client = await pool.query('SELECT * FROM Client WHERE ClientID = $1', [clientID]);
@@ -204,6 +205,15 @@ exports.createReceipt = async (req, res) => {
       [clientID, client.rows[0].paymentmethod, totalPayout, totalVolume, createdBy]
     );
     const receiptID = rows[0].receiptid;
+
+
+    // If a check number is provided, insert into CheckPayments table
+    if (checkNumber) {
+      await pool.query(
+        'INSERT INTO CheckPayments (ReceiptID, CheckNumber) VALUES ($1, $2)',
+        [receiptID, checkNumber]
+      );
+    }
 
     // Insert metals based on client type
     if (client.rows[0].clienttype === 'auto') {
@@ -328,7 +338,7 @@ exports.createReceipt = async (req, res) => {
     res.json({ 
       message: 'Receipt created successfully', 
       receiptID,
-      clientLocation: client.rows[0].clientlocation // Add this line
+      clientLocation: client.rows[0].clientlocation
     });
   } catch (error) {
     await pool.query('ROLLBACK');
