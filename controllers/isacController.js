@@ -536,6 +536,227 @@ exports.adjustInsulationFee = async (req, res) => {
 
 
 
+
+
+
+
+// delete client and receipt functions
+
+
+// this function works and is in use
+exports.deleteReceipt = async (req, res) => {
+  const { receiptID } = req.params;
+  const { passcode } = req.body;
+
+  if (passcode !== process.env.DELETE_PASSCODE) {
+    return res.status(403).json({ message: 'Invalid passcode' });
+  }
+
+  try {
+    await pool.query('BEGIN');
+
+    // Fetch receipt details including client type
+    const { rows: receiptRows } = await pool.query(`
+      SELECT r.ClientID, r.TotalVolume, r.TotalPayout, c.ClientType
+      FROM Receipt r
+      JOIN Client c ON r.ClientID = c.ClientID
+      WHERE r.ReceiptID = $1
+    `, [receiptID]);
+    
+    if (receiptRows.length === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(404).json({ message: 'Receipt not found' });
+    }
+
+    const { clientid, totalvolume, totalpayout, clienttype } = receiptRows[0];
+
+    // Delete related records and update totals based on client type
+    switch (clienttype.toLowerCase()) {
+      case 'auto':
+        const { rows: autoMetals } = await pool.query('SELECT * FROM AutoReceiptMetals WHERE ReceiptID = $1', [receiptID]);
+        if (autoMetals.length > 0) {
+          await pool.query(`
+            UPDATE AutoClientTotals
+            SET TotalDrumsRotors = GREATEST(0, COALESCE(TotalDrumsRotors, 0) - COALESCE($1::decimal, 0)),
+                TotalShortIron = GREATEST(0, COALESCE(TotalShortIron, 0) - COALESCE($2::decimal, 0)),
+                TotalShredSteel = GREATEST(0, COALESCE(TotalShredSteel, 0) - COALESCE($3::decimal, 0)),
+                TotalAluminumBreakage = GREATEST(0, COALESCE(TotalAluminumBreakage, 0) - COALESCE($4::decimal, 0)),
+                TotalDirtyAluminumRadiators = GREATEST(0, COALESCE(TotalDirtyAluminumRadiators, 0) - COALESCE($5::decimal, 0)),
+                TotalWiringHarness = GREATEST(0, COALESCE(TotalWiringHarness, 0) - COALESCE($6::decimal, 0)),
+                TotalACCompressor = GREATEST(0, COALESCE(TotalACCompressor, 0) - COALESCE($7::decimal, 0)),
+                TotalAlternatorStarter = GREATEST(0, COALESCE(TotalAlternatorStarter, 0) - COALESCE($8::decimal, 0)),
+                TotalAluminumRims = GREATEST(0, COALESCE(TotalAluminumRims, 0) - COALESCE($9::decimal, 0)),
+                TotalChromeRims = GREATEST(0, COALESCE(TotalChromeRims, 0) - COALESCE($10::decimal, 0)),
+                TotalBrassCopperRadiator = GREATEST(0, COALESCE(TotalBrassCopperRadiator, 0) - COALESCE($11::decimal, 0)),
+                TotalPayout = GREATEST(0, COALESCE(TotalPayout, 0) - COALESCE($12::decimal, 0))
+            WHERE ClientID = $13
+          `, [
+            autoMetals[0].drumsrotorsweight, autoMetals[0].shortironweight, autoMetals[0].shredsteelweight,
+            autoMetals[0].aluminumbreakageweight, autoMetals[0].dirtyaluminumradiatorsweight, autoMetals[0].wiringharnessweight,
+            autoMetals[0].accompressorweight, autoMetals[0].alternatorstarterweight, autoMetals[0].aluminumrimsweight,
+            autoMetals[0].chromerimweight, autoMetals[0].brasscopperradiatorweight, totalpayout, clientid
+          ]);
+        }
+        await pool.query('DELETE FROM AutoReceiptMetals WHERE ReceiptID = $1', [receiptID]);
+        await pool.query('DELETE FROM CatalyticConverter WHERE ReceiptID = $1', [receiptID]);
+        break;
+
+      case 'hvac':
+        const { rows: hvacMetals } = await pool.query('SELECT * FROM HVACReceiptMetals WHERE ReceiptID = $1', [receiptID]);
+        if (hvacMetals.length > 0) {
+          await pool.query(`
+            UPDATE HVACClientTotals
+            SET TotalShredSteel = GREATEST(0, COALESCE(TotalShredSteel, 0) - COALESCE($1::decimal, 0)),
+                TotalDirtyAlumCopperRadiators = GREATEST(0, COALESCE(TotalDirtyAlumCopperRadiators, 0) - COALESCE($2::decimal, 0)),
+                TotalCleanAluminumRadiators = GREATEST(0, COALESCE(TotalCleanAluminumRadiators, 0) - COALESCE($3::decimal, 0)),
+                TotalCopperTwo = GREATEST(0, COALESCE(TotalCopperTwo, 0) - COALESCE($4::decimal, 0)),
+                TotalCompressors = GREATEST(0, COALESCE(TotalCompressors, 0) - COALESCE($5::decimal, 0)),
+                TotalDirtyBrass = GREATEST(0, COALESCE(TotalDirtyBrass, 0) - COALESCE($6::decimal, 0)),
+                TotalElectricMotors = GREATEST(0, COALESCE(TotalElectricMotors, 0) - COALESCE($7::decimal, 0)),
+                TotalAluminumBreakage = GREATEST(0, COALESCE(TotalAluminumBreakage, 0) - COALESCE($8::decimal, 0)),
+                TotalPayout = GREATEST(0, COALESCE(TotalPayout, 0) - COALESCE($9::decimal, 0))
+            WHERE ClientID = $10
+          `, [
+            hvacMetals[0].shredsteelweight, hvacMetals[0].dirtyalumcopperradiatorsweight, hvacMetals[0].cleanaluminumradiatorsweight,
+            hvacMetals[0].coppertwoweight, hvacMetals[0].compressorsweight, hvacMetals[0].dirtybrassweight,
+            hvacMetals[0].electricmotorsweight, hvacMetals[0].aluminumbreakageweight, totalpayout, clientid
+          ]);
+        }
+        await pool.query('DELETE FROM HVACReceiptMetals WHERE ReceiptID = $1', [receiptID]);
+        break;
+
+      case 'insulation':
+        const { rows: insulationMetals } = await pool.query('SELECT * FROM InsulationReceiptMetals WHERE ReceiptID = $1', [receiptID]);
+        if (insulationMetals.length > 0) {
+          await pool.query(`
+            UPDATE InsulationClientTotals
+            SET TotalDumpFees = GREATEST(0, COALESCE(TotalDumpFees, 0) - COALESCE($1::decimal, 0)),
+                TotalHaulFees = GREATEST(0, COALESCE(TotalHaulFees, 0) - COALESCE($2::decimal, 0))
+            WHERE ClientID = $3
+          `, [insulationMetals[0].dumpfee, insulationMetals[0].haulfee, clientid]);
+        }
+        await pool.query('DELETE FROM InsulationReceiptMetals WHERE ReceiptID = $1', [receiptID]);
+        break;
+    }
+
+    // Delete common related records
+    await pool.query('DELETE FROM UserDefinedMetal WHERE ReceiptID = $1', [receiptID]);
+    await pool.query('DELETE FROM CheckPayments WHERE ReceiptID = $1', [receiptID]);
+
+    // Delete the receipt
+    await pool.query('DELETE FROM Receipt WHERE ReceiptID = $1', [receiptID]);
+
+    // Update Client table
+    await pool.query(`
+      UPDATE Client 
+      SET TotalVolume = GREATEST(0, COALESCE(TotalVolume, 0) - COALESCE($1::decimal, 0)), 
+          TotalPayout = GREATEST(0, COALESCE(TotalPayout, 0) - COALESCE($2::decimal, 0)) 
+      WHERE ClientID = $3
+    `, [totalvolume, totalpayout, clientid]);
+
+    await pool.query('COMMIT');
+    res.status(200).json({ message: 'Receipt deleted successfully' });
+  } catch (error) {
+    await pool.query('ROLLBACK');
+    console.error('Error deleting receipt:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+
+
+// this function is not implemented in the front end
+// (also has never been tested)
+// it has too many cascading effects on the database
+// seems too dangerous to give users this much power
+exports.deleteClient = async (req, res) => {
+  const { clientID } = req.params;
+  const { passcode } = req.body;
+
+  if (passcode !== process.env.DELETE_PASSCODE) {
+    return res.status(403).json({ message: 'Invalid passcode' });
+  }
+
+  try {
+    await pool.query('BEGIN');
+
+    // Fetch client details
+    const { rows } = await pool.query('SELECT ClientType FROM Client WHERE ClientID = $1', [clientID]);
+    
+    if (rows.length === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
+    const { clienttype } = rows[0];
+
+    // Delete related records based on client type
+    switch (clienttype.toLowerCase()) {
+      case 'auto':
+        await pool.query('DELETE FROM AutoClientTotals WHERE ClientID = $1', [clientID]);
+        await pool.query(`
+          DELETE FROM AutoReceiptMetals 
+          WHERE ReceiptID IN (SELECT ReceiptID FROM Receipt WHERE ClientID = $1)
+        `, [clientID]);
+        await pool.query(`
+          DELETE FROM CatalyticConverter 
+          WHERE ReceiptID IN (SELECT ReceiptID FROM Receipt WHERE ClientID = $1)
+        `, [clientID]);
+        break;
+      case 'hvac':
+        await pool.query('DELETE FROM HVACClientTotals WHERE ClientID = $1', [clientID]);
+        await pool.query(`
+          DELETE FROM HVACReceiptMetals 
+          WHERE ReceiptID IN (SELECT ReceiptID FROM Receipt WHERE ClientID = $1)
+        `, [clientID]);
+        break;
+      case 'insulation':
+        await pool.query('DELETE FROM InsulationClientTotals WHERE ClientID = $1', [clientID]);
+        await pool.query(`
+          DELETE FROM InsulationReceiptMetals 
+          WHERE ReceiptID IN (SELECT ReceiptID FROM Receipt WHERE ClientID = $1)
+        `, [clientID]);
+        break;
+    }
+
+    // Delete common related records
+    await pool.query('DELETE FROM Request WHERE ClientID = $1', [clientID]);
+    await pool.query(`
+      DELETE FROM UserDefinedMetal 
+      WHERE ReceiptID IN (SELECT ReceiptID FROM Receipt WHERE ClientID = $1)
+    `, [clientID]);
+    await pool.query(`
+      DELETE FROM CheckPayments 
+      WHERE ReceiptID IN (SELECT ReceiptID FROM Receipt WHERE ClientID = $1)
+    `, [clientID]);
+
+    // Delete all receipts for this client
+    await pool.query('DELETE FROM Receipt WHERE ClientID = $1', [clientID]);
+
+    // Finally, delete the client
+    const { rowCount } = await pool.query('DELETE FROM Client WHERE ClientID = $1', [clientID]);
+
+    if (rowCount === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
+    await pool.query('COMMIT');
+
+    res.status(200).json({ message: 'Client and all related data deleted successfully' });
+  } catch (error) {
+    await pool.query('ROLLBACK');
+    console.error('Error deleting client:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+
+
+
+
+
+
 /*******************************************************
  *                       USERS                         *
  *                                                     *

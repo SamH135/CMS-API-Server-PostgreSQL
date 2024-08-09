@@ -61,8 +61,14 @@ router.post('/updateUser', asyncHandler(isacController.updateUser));
 router.get('/searchUsers', asyncHandler(isacController.searchUsers));
 router.post('/addClient', authenticateISACToken, authorizeRole('admin'), asyncHandler(isacController.addClient));
 
-router.delete('/deleteRequests', asyncHandler(isacController.deleteMultipleRequests));
 
+// DELETE RECORDS routes
+router.delete('/deleteRequests', asyncHandler(isacController.deleteMultipleRequests));
+router.delete('/deleteReceipt/:receiptID', asyncHandler(isacController.deleteReceipt));
+router.delete('/deleteClient/:clientID', asyncHandler(isacController.deleteClient));
+
+
+// Prices routes
 router.get('/hvac-prices', asyncHandler(isacController.getHVACPrices));
 router.post('/hvac-prices', asyncHandler(isacController.setHVACPrices));
 router.get('/auto-prices', asyncHandler(isacController.getAutoPrices));
