@@ -1334,7 +1334,8 @@ exports.setHVACPrices = async (req, res) => {
       SELECT r.*, c.ClientName 
       FROM Receipt r
       JOIN Client c ON r.ClientID = c.ClientID
-      WHERE r.ReceiptID::text ILIKE $1 OR c.ClientName ILIKE $1
+      WHERE r.ReceiptID::text ILIKE $1 OR c.ClientName ILIKE $1 OR r.CreatedBy ILIKE $1
+      ORDER BY r.PickupTime DESC
     `, [`%${term}%`]);
     return rows;
   }
@@ -1391,15 +1392,11 @@ exports.setHVACPrices = async (req, res) => {
       if (term) {
         // Search by client name or location (no changes needed here)
         query = `
-          WITH RankedReceipts AS (
-            SELECT r.*, c.ClientName, c.ClientLocation, c.NeedsPickup,
-                   ROW_NUMBER() OVER (PARTITION BY r.ClientID ORDER BY r.PickupDate DESC, r.PickupTime DESC) as rn
-            FROM Receipt r
-            JOIN Client c ON r.ClientID = c.ClientID
-            WHERE c.ClientName ILIKE $1 OR c.ClientLocation ILIKE $1
-          )
-          SELECT * FROM RankedReceipts WHERE rn = 1
-          ORDER BY PickupDate DESC, PickupTime DESC
+          SELECT r.*, c.ClientName, c.ClientLocation
+          FROM Receipt r
+          JOIN Client c ON r.ClientID = c.ClientID
+          WHERE r.ReceiptID::text ILIKE $1 OR c.ClientName ILIKE $1 OR r.CreatedBy ILIKE $1
+          ORDER BY r.PickupTime DESC
         `;
         queryParams = [`%${term}%`];
       } else if (date && timeZone) {
