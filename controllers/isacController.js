@@ -223,7 +223,6 @@ exports.getClientTotals = async (req, res) => {
   }
 };
 
-
 exports.addClient = async (req, res) => {
   const {
     clientname,
@@ -234,7 +233,6 @@ exports.addClient = async (req, res) => {
     locationcontact,
     paymentmethod
   } = req.body;
-
 
   // Validate payment method
   const validPaymentMethods = ['Cash', 'Check', 'Direct Deposit'];
@@ -252,13 +250,14 @@ exports.addClient = async (req, res) => {
     const clientQuery = `
       INSERT INTO Client (
         ClientName, ClientLocation, ClientType, AvgTimeBetweenPickups,
-        LocationNotes, LocationContact, PaymentMethod, RegistrationDate, NeedsPickup
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, false)
+        LocationNotes, LocationContact, PaymentMethod, RegistrationDate, 
+        TotalPayout, TotalVolume, LastPickupDate, NeedsPickup
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, 0, 0, CURRENT_DATE, false)
       RETURNING ClientID
     `;
     const { rows } = await client.query(clientQuery, [
       clientname, clientlocation, clienttype, avgtimebetweenpickups,
-      locationnotes, locationcontact, paymentmethod
+      locationnotes || '', locationcontact || '', paymentmethod
     ]);
 
     const clientID = rows[0].clientid;
