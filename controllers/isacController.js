@@ -427,7 +427,6 @@ async function getClientMetals(clientType, clientID) {
 async function getClientTotals(clientType, clientID) {
   let query;
   switch (clientType.toLowerCase()) {
-
     case 'auto':
       query = `
         SELECT act.TotalPayout, 
@@ -435,9 +434,8 @@ async function getClientTotals(clientType, clientID) {
                 act.TotalDirtyAluminumRadiators + act.TotalWiringHarness + act.TotalACCompressor + 
                 act.TotalAlternatorStarter + act.TotalAluminumRims + act.TotalChromeRims + 
                 act.TotalBrassCopperRadiator) as TotalVolume, 
-               c.LastPickupDate 
+               (SELECT PickupTime FROM Receipt WHERE ClientID = $1 ORDER BY PickupTime DESC LIMIT 1) as LastPickupTime
         FROM AutoClientTotals act
-        JOIN Client c ON c.ClientID = act.ClientID
         WHERE act.ClientID = $1
       `;
       break;
@@ -448,9 +446,8 @@ async function getClientTotals(clientType, clientID) {
                 (hct.TotalShredSteel + hct.TotalDirtyAlumCopperRadiators + hct.TotalCleanAluminumRadiators + 
                 hct.TotalCopperTwo + hct.TotalCompressors + hct.TotalDirtyBrass + 
                 hct.TotalElectricMotors + hct.TotalAluminumBreakage) as TotalVolume, 
-                c.LastPickupDate 
+                (SELECT PickupTime FROM Receipt WHERE ClientID = $1 ORDER BY PickupTime DESC LIMIT 1) as LastPickupTime
         FROM HVACClientTotals hct
-        JOIN Client c ON c.ClientID = hct.ClientID
         WHERE hct.ClientID = $1
       `;
       break;
@@ -459,9 +456,8 @@ async function getClientTotals(clientType, clientID) {
       query = `
         SELECT ict.TotalDumpFees + ict.TotalHaulFees as TotalPayout, 
                 0 as TotalVolume, 
-                c.LastPickupDate 
+                (SELECT PickupTime FROM Receipt WHERE ClientID = $1 ORDER BY PickupTime DESC LIMIT 1) as LastPickupTime
         FROM InsulationClientTotals ict
-        JOIN Client c ON c.ClientID = ict.ClientID
         WHERE ict.ClientID = $1
       `;
       break;
@@ -471,7 +467,7 @@ async function getClientTotals(clientType, clientID) {
         SELECT 
           SUM(r.TotalPayout) as TotalPayout,
           SUM(r.TotalVolume) as TotalVolume,
-          MAX(r.PickupDate) as LastPickupDate
+          MAX(r.PickupTime) as LastPickupTime
         FROM Receipt r
         WHERE r.ClientID = $1
       `;

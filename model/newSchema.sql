@@ -13,10 +13,10 @@ CREATE TABLE Client (
   LocationNotes TEXT,
   RegistrationDate DATE NOT NULL,
   LocationContact VARCHAR(100),
-  TotalPayout DECIMAL(15, 2) NOT NULL CHECK (TotalPayout >= 0),
+  TotalPayout DECIMAL(15, 2) NOT NULL,
   TotalVolume DECIMAL(15, 2) NOT NULL CHECK (TotalVolume >= 0),
   PaymentMethod VARCHAR(20) NOT NULL CHECK (PaymentMethod IN ('Cash', 'Check', 'Direct Deposit')),
-  LastPickupDate DATE NOT NULL,
+  LastPickupDate DATE,
   NeedsPickup BOOLEAN NOT NULL,
   CONSTRAINT check_client_type CHECK (ClientType IN ('auto', 'hvac', 'insulation', 'other'))
 );
