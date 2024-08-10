@@ -1431,11 +1431,15 @@ exports.setHVACPrices = async (req, res) => {
 
 // function to make CSV file from receipt/client data
 exports.generateCSV = async (req, res) => {
-  const { startDate, endDate, columnOrder, columnNames } = req.body;
+  const { startDate, endDate, columnOrder, columnNames, timeZone } = req.body;
 
   try {
+    // Convert start and end dates to the user's time zone, then to UTC
+    const userStartDate = startOfDay(toDate(parseISO(startDate), { timeZone }));
+    const userEndDate = endOfDay(toDate(parseISO(endDate), { timeZone }));
+
     // Check for unresolved checks
-    const unresolvedChecks = await checkUnresolvedChecks(startDate, endDate);
+    const unresolvedChecks = await checkUnresolvedChecks(userStartDate, userEndDate);
     if (unresolvedChecks.length > 0) {
       return res.status(400).json({ 
         message: 'Unresolved checks found. Please resolve before generating CSV.', 
@@ -1445,15 +1449,15 @@ exports.generateCSV = async (req, res) => {
 
     // Fetch all receipts within the date range
     const query = `
-      SELECT r.ReceiptID, c.ClientName, r.PickupDate, c.PaymentMethod, r.TotalPayout, cp.CheckNumber
+      SELECT r.ReceiptID, c.ClientName, r.PickupTime, c.PaymentMethod, r.TotalPayout, cp.CheckNumber
       FROM Receipt r
       JOIN Client c ON r.ClientID = c.ClientID
       LEFT JOIN CheckPayments cp ON r.ReceiptID = cp.ReceiptID
-      WHERE r.PickupDate::date BETWEEN $1::date AND $2::date
-      ORDER BY r.PickupDate
+      WHERE r.PickupTime >= $1 AND r.PickupTime < $2
+      ORDER BY r.PickupTime
     `;
     
-    const { rows } = await pool.query(query, [startDate, endDate]);
+    const { rows } = await pool.query(query, [userStartDate, userEndDate]);
 
     if (rows.length === 0) {
       return res.status(404).json({ message: 'No receipts found for the specified date range.' });
@@ -1467,7 +1471,7 @@ exports.generateCSV = async (req, res) => {
           case 'ClientName':
             return row.clientname || '';
           case 'PickupDate':
-            return row.pickupdate ? new Date(row.pickupdate).toLocaleDateString() : '';
+            return formatInTimeZone(row.pickuptime, timeZone, 'yyyy-MM-dd');
           case 'PaymentMethod':
             return paymentMethod || '';
           case 'TotalPayout':
@@ -1492,13 +1496,64 @@ exports.generateCSV = async (req, res) => {
   }
 };
 
+exports.previewCSV = async (req, res) => {
+  const { startDate, endDate, columnOrder, columnNames, timeZone } = req.body;
+  try {
+    // Convert start and end dates to the user's time zone, then to UTC
+    const userStartDate = startOfDay(toDate(parseISO(startDate), { timeZone }));
+    const userEndDate = endOfDay(toDate(parseISO(endDate), { timeZone }));
+
+    const query = `
+      SELECT r.ReceiptID, c.ClientName, r.PickupTime, c.PaymentMethod, r.TotalPayout, cp.CheckNumber
+      FROM Receipt r
+      JOIN Client c ON r.ClientID = c.ClientID
+      LEFT JOIN CheckPayments cp ON r.ReceiptID = cp.ReceiptID
+      WHERE r.PickupTime >= $1 AND r.PickupTime < $2
+      ORDER BY r.PickupTime
+      LIMIT 5
+    `;
+    const { rows } = await pool.query(query, [userStartDate, userEndDate]);
+
+    const previewData = rows.map(row => {
+      const formattedRow = {};
+      columnOrder.forEach(field => {
+        switch (field) {
+          case 'ClientName':
+            formattedRow[field] = row.clientname || '';
+            break;
+          case 'PickupDate':
+            formattedRow[field] = formatInTimeZone(row.pickuptime, timeZone, 'yyyy-MM-dd');
+            break;
+          case 'PaymentMethod':
+            formattedRow[field] = row.paymentmethod || '';
+            break;
+          case 'TotalPayout':
+            formattedRow[field] = typeof row.totalpayout === 'number' ? row.totalpayout.toFixed(2) : '0.00';
+            break;
+          case 'CheckNumber':
+            formattedRow[field] = row.checknumber || '';
+            break;
+          default:
+            formattedRow[field] = '';
+        }
+      });
+      return formattedRow;
+    });
+
+    res.status(200).json({ previewData });
+  } catch (error) {
+    console.error('Error generating CSV preview:', error);
+    res.status(500).json({ message: 'Error generating CSV preview' });
+  }
+};
+
 async function checkUnresolvedChecks(startDate, endDate) {
   const query = `
-    SELECT r.ReceiptID, c.ClientName, r.PickupDate
+    SELECT r.ReceiptID, c.ClientName, r.PickupTime
     FROM Receipt r
     JOIN Client c ON r.ClientID = c.ClientID
     JOIN CheckPayments cp ON r.ReceiptID = cp.ReceiptID
-    WHERE r.PickupDate::date BETWEEN $1::date AND $2::date AND cp.CheckNumber = '0000'
+    WHERE r.PickupTime >= $1 AND r.PickupTime < $2 AND cp.CheckNumber = '0000'
   `;
   const { rows } = await pool.query(query, [startDate, endDate]);
   return rows;

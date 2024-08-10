@@ -79,6 +79,8 @@ router.post('/adjustInsulationFee', asyncHandler(isacController.adjustInsulation
 
 // CSV generation routes
 router.post('/generate-csv', asyncHandler(isacController.generateCSV));
+router.post('/preview-csv', isacController.previewCSV);
+
 
 // Check payment logic routes
 router.get('/unresolved-checks', asyncHandler(isacController.getUnresolvedChecks));
