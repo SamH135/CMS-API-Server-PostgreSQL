@@ -81,8 +81,8 @@ router.post('/adjustInsulationFee', asyncHandler(isacController.adjustInsulation
 router.post('/generate-csv', asyncHandler(isacController.generateCSV));
 
 // Check payment logic routes
-router.get('/api/unresolved-checks', isacController.getUnresolvedChecks);
-router.post('/api/update-check-number', isacController.updateCheckNumber);
+router.get('/unresolved-checks', asyncHandler(isacController.getUnresolvedChecks));
+router.post('/update-check-number', asyncHandler(isacController.updateCheckNumber));
 
 router.post('/updateReceipt', asyncHandler(isacController.updateReceipt));
 router.post('/updateCheckNumber', asyncHandler(isacController.updateCheckNumber));
